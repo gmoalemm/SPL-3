@@ -9,9 +9,11 @@ import api.MessageEncoderDecoder;
 public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
     private final byte[] packetBytes = new byte[1 << 10];
     private final ArrayDeque<Byte> messageData = new ArrayDeque<>();
-    private int len;
-    private OpCodes msgType;
+
+    private int len;    // how many byted did we read into the current packet
+    private OpCodes opcode;
     private short leftToRead = 0;
+
     private boolean lastDataPacket = true;
 
     public static final int MAX_DATA_PACKET = 512;
@@ -22,13 +24,13 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
 
         if (len == 1) return null;
 
-        if (len == 2) msgType = OpCodes.fromBytes(packetBytes[0], packetBytes[1]);
+        if (len == 2) opcode = OpCodes.fromBytes(packetBytes[0], packetBytes[1]);
 
         if (len == 2){
-            System.out.println("Got " + msgType.name() + " message");
+            System.out.println("Got " + opcode.name() + " message");
         }
 
-        switch (msgType) {
+        switch (opcode) {
             case RRQ:
             case WRQ:
             case LOGRQ:
@@ -46,11 +48,8 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
             case BCAST:
                 return decodeBCAST();
             default:
-                // TODO: error?
-                break;
+                return OpCodes.UNKNOWN.getBytes();
         }
-
-        return null;
     }
 
     private byte[] decodeTerminatedBy0() {
@@ -127,7 +126,6 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
     }
 
     private byte[] decodeERR() {
-
         byte[] message = null;
 
         if (len > 4 && packetBytes[len - 1] == 0) {
@@ -137,6 +135,24 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
 
         return message;
     }
+
+    // private byte[] getIllegalOpCodeMSG(){
+    //     byte[] msg = (new String("Illegal TFTP operation – Unknown Opcode.")).getBytes();
+    //     byte[] err = new byte[5 + msg.length];
+
+    //     err[0] = OpCodes.ERROR.getBytes()[0];
+    //     err[1] = OpCodes.ERROR.getBytes()[1];
+    //     err[2] = shortToBytes((short)4)[0];
+    //     err[3] = shortToBytes((short)4)[1];
+
+    //     for (int i = 0; i < msg.length; i++){
+    //         err[4 + i] = msg[i];
+    //     }
+
+    //     err[err.length - 1] = 0;
+
+    //     return err;
+    // }
 
     //////////////////////// ENCODER //////////////////////
 
