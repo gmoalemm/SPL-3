@@ -1,9 +1,5 @@
 package srv;
 
-import java.io.IOException;
-import java.net.ContentHandler;
-import java.util.HashMap;
-
 /**
  * Implement Connections<T> to hold a list of the new ConnectionHandler
  * interface for each active client. Use it to implement the interface

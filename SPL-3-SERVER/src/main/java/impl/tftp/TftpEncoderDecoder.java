@@ -2,7 +2,6 @@ package impl.tftp;
 
 import java.util.ArrayDeque;
 import java.util.Arrays;
-import impl.tftp.OpCodes;
 
 import api.MessageEncoderDecoder;
 

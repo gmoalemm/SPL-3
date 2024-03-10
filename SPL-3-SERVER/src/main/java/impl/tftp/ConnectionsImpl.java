@@ -6,7 +6,7 @@ import srv.ConnectionHandler;
 import srv.Connections;
 
 public class ConnectionsImpl<T> implements Connections<T> {
-    private ConcurrentHashMap<Integer, ConnectionHandler<T>> connectionsMap = new ConcurrentHashMap<>();
+    public final ConcurrentHashMap<Integer, ConnectionHandler<T>> connectionsMap = new ConcurrentHashMap<>();
 
     @Override
     public boolean connect(int connectionId, ConnectionHandler<T> handler) {
@@ -24,9 +24,6 @@ public class ConnectionsImpl<T> implements Connections<T> {
         ConnectionHandler<T> handler = connectionsMap.get(connectionId);
 
         handler.send(msg);
-
-//        // TODO Auto-generated method stub
-//        throw new UnsupportedOperationException("Unimplemented method 'send'");
 
         return true;
     }
