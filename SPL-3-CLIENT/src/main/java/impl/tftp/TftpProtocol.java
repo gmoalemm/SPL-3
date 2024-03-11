@@ -1,13 +1,10 @@
 package impl.tftp;
 
-import api.BidiMessagingProtocol;
 import api.MessagingProtocol;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
-import java.util.Map;
 import java.util.Queue;
-import java.util.concurrent.LinkedBlockingDeque;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -18,22 +15,24 @@ import java.nio.file.Paths;
 
 public class TftpProtocol implements MessagingProtocol<byte[]> {
     private boolean shouldTerminate = false;
-    private short lastBlockNumber = 0;
+    private short lastBlockNumber = 1;
     private Queue<byte[]> packetsQueue; // packets that require ACK only
+    private OpCodes lastKeyboardOptOpcode = OpCodes.UNKNOWN;
     private File currentFile;
     private final String directoryPath = "/SPL-3-CLIENT/";
+    private ArrayDeque<Byte> currentDirName = new ArrayDeque<>();
 
     @Override
     public byte[] process(byte[] message) {
         OpCodes opcode = OpCodes.fromBytes(message[0], message[1]);
+        byte[] response = null;
 
         switch (opcode) {
             case DATA:
-                handleData(message);
+                response = handleData(message);
                 break;
             case ACK:
-                short blockNum = TftpEncoderDecoder.bytesToShort(message[2], message[3]);
-                handleACK(blockNum);
+                response = handleACK(message);
                 break;
             case ERROR:
                 handleError(message);
@@ -41,9 +40,14 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
             case BCAST:
                 handleBCAST(message);
                 break;
+            case UNKNOWN:
+                response = createErrorMessage(Errors.NOT_DEFINED);
+                break;
             default:
-                return createErrorMessage(Errors.NOT_DEFINED);
+                lastKeyboardOptOpcode = opcode;
         }
+
+        return response;
     }
 
     @Override
@@ -69,71 +73,74 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
         return pac;
     }
 
-    private byte[] handleACK(short blockNumber) {
-        byte[] lastSentPacket = packetsQueue.peek();
-        short packetBlockNum = TftpEncoderDecoder.bytesToShort(lastSentPacket[2], lastSentPacket[3]);
-        OpCodes opcode = OpCodes.fromBytes(lastSentPacket[0], lastSentPacket[1]);
+    private byte[] handleACK(byte[] message) {
+        //short packetBlockNum = TftpEncoderDecoder.bytesToShort(lastSentPacket[2], lastSentPacket[3]);
+            
+        short ackBlockNum = TftpEncoderDecoder.bytesToShort(message[2], message[3]);
+
+        OpCodes opcode;
+
+        byte[] lastSentPacket = null;
+
+        if (ackBlockNum == 0){
+            opcode = lastKeyboardOptOpcode;
+        }
+        else if (packetsQueue.isEmpty()) {
+            return createErrorMessage(Errors.NOT_DEFINED);
+        }
+        else{
+            lastSentPacket = packetsQueue.peek(); 
+            opcode = OpCodes.fromBytes(lastSentPacket[0], lastSentPacket[1]); //the type of the last messege sent.
+        }
+
+        short packetBlockNum = opcode == OpCodes.DATA ? TftpEncoderDecoder.bytesToShort(lastSentPacket[0], lastSentPacket[1]): 0;
+        byte[] response = null;
+
+        if (packetBlockNum != ackBlockNum){
+            System.out.println("Got ACK with blockNumber that doest coresponding to the last massege blockNumber");
+            return createErrorMessage(Errors.NOT_DEFINED);
+        }
+
+        String filename;
 
         switch (opcode) {
-            // sent data, got ack
-            case DATA:
-                if (packetBlockNum != blockNumber)
-                    return createErrorMessage(Errors.NOT_DEFINED);
-
-                packetsQueue.remove();
-
+            case RRQ:
+                filename = new String(message, 2, message.length - 2, StandardCharsets.UTF_8);
+                resetFile(filename);
                 break;
-
-            // sent login, got ack
-            case LOGRQ:
-
-                // sent delete req., got ack (file deleted)
-            case DELRQ:
-                if (packetBlockNum != 0)
-                    return createErrorMessage(Errors.NOT_DEFINED);
-
-                break;
-
-            // sent WRQ, got ack. now start sending the data packets
             case WRQ:
-                if (packetBlockNum != blockNumber)
-                    return createErrorMessage(Errors.NOT_DEFINED);
-
-                // TODO: send data
-
+                filename = new String(message, 2, message.length - 2, StandardCharsets.UTF_8);
+                addDataPackets(filename);
+            case DATA:
+                packetsQueue.remove();
+                response = packetsQueue.peek();
                 break;
-
+            case LOGRQ:
+                System.out.println("this clinet was successfully logged in to server");
+                break;
+            // sent delete req., got ack (file deleted)
+            case DELRQ:
+                System.out.println("the file was successfully deleted");
+                break;
             // requested to disconnect, got acknoleged
             case DISC:
-                if (packetBlockNum != 0)
-                    return createErrorMessage(Errors.NOT_DEFINED);
-
-                shouldTerminate = false;
+                shouldTerminate = true;
                 break;
             default:
+                response = createErrorMessage(Errors.NOT_DEFINED);
                 break;
         }
 
-        return null;
+        return response;
     }
 
-    private void handleRRQ(String filename) {
-        // open the file
-        File file;
-        ArrayDeque<Byte> packetData;
-        byte[] packet;
-        short blockNumber = 1;
-        int nextByte;
+    private void addDataPackets(String filename){
+        File fileToSend = new File(directoryPath + filename);
 
-        file = new File(directoryPath + filename);
-
-        if (!file.exists()) {
-            connections.send(connectionId, createErrorMessage(Errors.FILE_NOT_FOUND));
-            return;
-        }
-
-        try (FileInputStream fstream = new FileInputStream(file)) {
-            packetData = new ArrayDeque<>();
+        try (FileInputStream fstream = new FileInputStream(fileToSend)) {
+            ArrayDeque<Byte> packetData = new ArrayDeque<>();
+            int nextByte;
+            byte[] packet;
 
             // read each byte
             while ((nextByte = fstream.read()) != -1) {
@@ -141,130 +148,54 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
 
                 // if reached max num of bytes in a packet, create one
                 if (packetData.size() == TftpEncoderDecoder.MAX_DATA_PACKET) {
-                    packet = buildDataPacket(packetData, blockNumber++);
+                    packet = buildDataPacket(packetData, lastBlockNumber++);
                     packetsQueue.add(packet);
                     packetData.clear();
                 }
             }
 
             // last packet
-            packet = buildDataPacket(packetData, blockNumber);
+            packet = buildDataPacket(packetData, lastBlockNumber);
             packetsQueue.add(packet);
-
-            connections.send(connectionId, packetsQueue.peek());
         } catch (IOException ignored) {
         }
     }
 
-    private void handleWRQ(String filename) {
-        // open the file
-        File file;
-        byte[] packet;
+    private void resetFile(String filename){
+        currentFile = new File(directoryPath + File.separator + filename);
 
-        file = new File(directoryPath + File.separator + filename);
-
-        if (file.exists()) {
-            connections.send(connectionId, createErrorMessage(Errors.FILE_EXISTS));
-            return;
+        //the file alredy exiset and the clinet want to get new version.
+        if (currentFile.exists()){
+            currentFile.delete();
         }
 
-        try {
-            Path filePath = Paths.get(directoryPath + File.separator + filename);
+        Path filePath = Paths.get(directoryPath + File.separator + filename);
 
-            // Create the directory if it doesn't exist
+        // Create the directory if it doesn't exist
+        try {
             Files.createDirectory(filePath.getParent());
 
             // Create the file
             Files.createFile(filePath);
 
             currentFile = new File(filePath.toString());
-
-            System.out.println("File created successfully at: " + filePath);
-        } catch (IOException e) {
-            // Handle IOException
-            e.printStackTrace();
-        }
-
-        packet = buildAckPacket((short) 0);
-        connections.send(connectionId, packet); // send ack packet
-    }
-
-    private void handleDELRQ(String filename) {
-        // open the file
-        File file;
-
-        file = new File(directoryPath + filename);
-
-        if (file.exists()) {
-            file.delete();
-            connections.send(connectionId, buildAckPacket((short) 0));
-            sendBCAST(false, filename); // send all users about the update.
-        } else {
-            connections.send(connectionId, createErrorMessage(Errors.FILE_NOT_FOUND));
+        } catch (IOException ignored) {
+                
         }
     }
 
-    private void handleDIRQ() {
-        File folder = new File("server" + File.separator + "Files" + File.separator);
-        File[] files = folder.listFiles();
-        ArrayDeque<Byte> message = new ArrayDeque<>();
-        byte[] packet;
-
-        if (files != null) {
-            for (File file : files) {
-                if (message.size() == TftpEncoderDecoder.MAX_DATA_PACKET) {
-                    packet = buildDataPacket(message, ++lastBlockNumber);
-                    packetsQueue.add(packet);
-                    message.clear();
-                }
-
-                // assuming the file is not a directory
-
-                for (byte b : file.getName().getBytes()) {
-                    message.add(b);
-
-                    if (message.size() == TftpEncoderDecoder.MAX_DATA_PACKET) {
-                        packet = buildDataPacket(message, ++lastBlockNumber);
-                        packetsQueue.add(packet);
-                        message.clear();
-                    }
-                }
-
-                message.add((byte) 0);
-            }
-
-            message.removeFirst();
-            packet = buildDataPacket(message, ++lastBlockNumber);
-            packetsQueue.add(packet);
-        }
-    }
-
-    private void handleLogin(String username) {
-        // the clinet is alredy looge d in.
-        if (isLoggedIn || LoggedUsers.usersMap.containsValue(username)) {
-            connections.send(connectionId, createErrorMessage(Errors.ALR_LOGGED_IN));
-            return;
-        }
-
-        LoggedUsers.usersMap.put(connectionId, username);
-        System.out.println("Added " + username + " as #" + connectionId);
-        isLoggedIn = true;
-
-        // send ack
-        packetsQueue.add(buildAckPacket((short) 0));
-    }
-
-    private void handleData(byte[] packet) {
+    private byte[] handleData(byte[] packet) {
         short blockNumber = TftpEncoderDecoder.bytesToShort(packet[2], packet[3]);
+        short pacetSize = TftpEncoderDecoder.bytesToShort(packet[0], packet[1]);
+        byte[] bytes;
 
-        // case of the data pakeges contain file.
+        // case of the data package contain file.
         if (currentFile != null) {
             try (FileOutputStream fStream = new FileOutputStream(currentFile)) {
                 fStream.write(packet, 6, packet.length - 6);
             } catch (IOException ignored) {
             } finally {
-                if (packet.length < TftpEncoderDecoder.MAX_DATA_PACKET) {
-                    sendBCAST(true, currentFile.getName()); // send all useres about the uptadet
+                if (pacetSize < TftpEncoderDecoder.MAX_DATA_PACKET) {
                     currentFile = null; // the call for the file is finised.
                 }
             }
@@ -272,14 +203,33 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
         // the data is a files' names.
         else {
             for (int i = 6; i < packet.length; i++) {
-                if (packet[i] == 0)
-                    System.out.println();
+                if (packet[i] == 0){
+                    bytes = new byte[currentDirName.size()];
+
+                    for (int j = 0; j < bytes.length; j++) {
+                        bytes[j] = (byte) currentDirName.removeFirst();
+                    }  
+
+                    System.out.println(new String(bytes, StandardCharsets.UTF_8));
+                    currentDirName.clear();
+                }
                 else
-                    System.out.println(new String(new byte[] { packet[i] }, StandardCharsets.UTF_8));
+                    currentDirName.add(packet[i]);
+            }
+
+            if (pacetSize < TftpEncoderDecoder.MAX_DATA_PACKET){
+                bytes = new byte[currentDirName.size()];
+
+                for (int j = 0; j < bytes.length; j++) {
+                    bytes[j] = (byte) currentDirName.removeFirst();
+                }  
+
+                System.out.println(new String(bytes, StandardCharsets.UTF_8));
+                currentDirName.clear();
             }
         }
 
-        connections.send(connectionId, buildAckPacket(blockNumber));
+        return buildAckPacket(blockNumber);
     }
 
     private void handleError(byte[] packet) {
@@ -302,26 +252,6 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
             System.out.println("del ");
 
         System.out.println(filename);
-    }
-
-    private void sendBCAST(boolean added, String filename) {
-        byte[] filenameBytes = filename.getBytes(StandardCharsets.UTF_8);
-        byte[] packet = new byte[4 + filenameBytes.length];
-
-        packet[0] = OpCodes.BCAST.getBytes()[0];
-        packet[1] = OpCodes.BCAST.getBytes()[1];
-
-        packet[2] = added ? (byte) 1 : (byte) 0;
-
-        for (int i = 0; i < filenameBytes.length; i++)
-            packet[3 + i] = filenameBytes[i];
-
-        packet[packet.length - 1] = (byte) 0;
-
-        for (Map.Entry<Integer, String> entry : LoggedUsers.usersMap.entrySet()) {
-            Integer id = entry.getKey();
-            connections.send(id, packet);
-        }
     }
 
     /**

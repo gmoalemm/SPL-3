@@ -76,15 +76,12 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
                 connections.send(connectionId, buildAckPacket((short)0));
                 connections.disconnect(connectionId);
                 break;
-            case BCAST:
-                handleBCAST(message);
-                break;
             default:
                 connections.send(connectionId, createErrorMessage(Errors.ILLEGAL_OP));
                 return;
         }
 
-        if (!packetsQueue.isEmpty()) connections.send(connectionId, packetsQueue.remove());
+        //if (!packetsQueue.isEmpty()) connections.send(connectionId, packetsQueue.remove());
     }
 
     @Override
@@ -156,10 +153,6 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
     private void handleRRQ(String filename) {
         // open the file
         File file;
-        ArrayDeque<Byte> packetData;
-        byte[] packet;
-        short blockNumber = 1;
-        int nextByte;
 
         file = new File(directoryPath + filename);
 
@@ -169,24 +162,9 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
         }
 
         try (FileInputStream fstream = new FileInputStream(file)) {
-            packetData = new ArrayDeque<>();
-
-            // read each byte
-            while ((nextByte = fstream.read()) != -1) {
-                packetData.add((byte) nextByte);
-
-                // if reached max num of bytes in a packet, create one
-                if (packetData.size() == TftpEncoderDecoder.MAX_DATA_PACKET) {
-                    packet = buildDataPacket(packetData, blockNumber++);
-                    packetsQueue.add(packet);
-                    packetData.clear();
-                }
-            }
-
-            // last packet
-            packet = buildDataPacket(packetData, blockNumber);
-            packetsQueue.add(packet);
-
+            addDataPackets(filename);
+            
+            connections.send(connectionId, buildAckPacket((short)0));
             connections.send(connectionId, packetsQueue.peek());
         } catch (IOException ignored) {
         }
@@ -329,20 +307,6 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
         System.out.println("Error " + errNum + " (" + msg + ")");
     }
 
-    private void handleBCAST(byte[] message){
-        boolean added = message[2] == 1;
-        String filename = new String(message, 3, message.length - 4, StandardCharsets.UTF_8);
-
-        System.out.print("BCAST ");
-
-        if (added)
-            System.out.print("add ");
-        else
-            System.out.println("del ");
-
-        System.out.println(filename);
-    }
-
     private void sendBCAST(boolean added, String filename){
         byte[] filenameBytes = filename.getBytes(StandardCharsets.UTF_8);
         byte[] packet = new byte[4 + filenameBytes.length];
@@ -401,5 +365,55 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
         packet[3] = block[1];
 
         return packet;
+    }
+
+    private void addDataPackets(String filename){
+        File fileToSend = new File(directoryPath + filename);
+
+        try (FileInputStream fstream = new FileInputStream(fileToSend)) {
+            ArrayDeque<Byte> packetData = new ArrayDeque<>();
+            int nextByte;
+            byte[] packet;
+
+            // read each byte
+            while ((nextByte = fstream.read()) != -1) {
+                packetData.add((byte) nextByte);
+
+                // if reached max num of bytes in a packet, create one
+                if (packetData.size() == TftpEncoderDecoder.MAX_DATA_PACKET) {
+                    packet = buildDataPacket(packetData, lastBlockNumber++);
+                    packetsQueue.add(packet);
+                    packetData.clear();
+                }
+            }
+
+            // last packet
+            packet = buildDataPacket(packetData, lastBlockNumber);
+            packetsQueue.add(packet);
+        } catch (IOException ignored) {
+        }
+    }
+
+    private void resetFile(String filename){
+        currentFile = new File(directoryPath + File.separator + filename);
+
+        //the file alredy exiset and the clinet want to get new version.
+        if (currentFile.exists()){
+            currentFile.delete();
+        }
+
+        Path filePath = Paths.get(directoryPath + File.separator + filename);
+
+        // Create the directory if it doesn't exist
+        try {
+            Files.createDirectory(filePath.getParent());
+
+            // Create the file
+            Files.createFile(filePath);
+
+            currentFile = new File(filePath.toString());
+        } catch (IOException ignored) {
+                
+        }
     }
 }
