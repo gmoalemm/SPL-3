@@ -1,82 +1,163 @@
 package impl.tftp;
 
+import java.util.ArrayDeque;
+import java.util.Arrays;
+
 import api.MessageEncoderDecoder;
 
-import java.nio.charset.StandardCharsets;
+public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
+    private final byte[] packetBytes = new byte[1 << 10];
+    private final ArrayDeque<Byte> messageData = new ArrayDeque<>();
 
-public class TftpEncoderDecoder implements MessageEncoderDecoder<String> {
+    private int len;    // how many byted did we read into the current packet
+    private OpCodes opcode;
+    private short leftToRead = 0;
+
+    private boolean lastDataPacket = true;
+
+    public static final int MAX_DATA_PACKET = 512;
+
     @Override
-    public String decodeNextByte(byte nextByte) {
-        return null;
-    }
+    public byte[] decodeNextByte(byte nextByte) {
+        packetBytes[len++] = nextByte;
 
-    @Override
-    public byte[] encode(String message) {
-        String[] args = message.split(" ");
+        if (len == 1) return null;
 
-        OpCodes opcode = OpCodes.fromString(args[0]);
+        if (len == 2) opcode = OpCodes.fromBytes(packetBytes[0], packetBytes[1]);
 
-        System.out.println(opcode.name());
+        if (len == 2){
+            System.out.println("Got " + opcode.name() + " message");
+        }
 
         switch (opcode) {
             case RRQ:
-                break;
             case WRQ:
-                break;
             case LOGRQ:
-                return encodeLOGRQ(args);
             case DELRQ:
-                break;
+                return decodeTerminatedBy0();
             case DATA:
-                break;
+                return decodeData();
             case ACK:
-                // TODO: notice the client sends ACK automatically
-                return encodeACK(args);
+                return decodeAck();
             case ERROR:
-                break;
+                return decodeERR();
             case DIRQ:
-                break;
             case DISC:
-                break;
+                return decodeDIRQ_DISC();
+            case BCAST:
+                return decodeBCAST();
             default:
-                break;
+                return OpCodes.UNKNOWN.getBytes();
         }
-
-        return null;
     }
 
-    private byte[] encodeLOGRQ(String[] args){
-        if (args.length != 2){
-            return null;
+    private byte[] decodeTerminatedBy0() {
+        byte[] message = null;
+
+        if (packetBytes[len - 1] == 0) {
+            message = Arrays.copyOf(packetBytes, len);
+            len = 0;
         }
 
-        byte[] username = args[1].getBytes(StandardCharsets.UTF_8);
-        byte[] msg = new byte[3 + username.length];
-
-        msg[0] = OpCodes.LOGRQ.getBytes()[0];
-        msg[1] = OpCodes.LOGRQ.getBytes()[1];
-
-        for (int i = 0; i < username.length; i++)
-            msg[2 + i] = username[i];
-
-        msg[msg.length - 1] = 0;
-        return msg;
+        return message;
     }
 
-    private byte[] encodeACK(String[] args){
-        if (args.length != 2){
-            return null;
+    private byte[] decodeDIRQ_DISC() {
+        byte[] message = Arrays.copyOf(packetBytes, len);
+        len = 0;
+
+        return message;
+    }
+
+    private byte[] decodeData() {
+        byte[] message = null;
+
+        if (len == 4) {
+            leftToRead = bytesToShort(packetBytes[2], packetBytes[3]);
+            leftToRead += 2; // the size of block-number field
+            lastDataPacket = leftToRead < 2 + MAX_DATA_PACKET;
         }
 
-        byte[] block = shortToBytes(Short.parseShort(args[1]));
-        byte[] msg = new byte[4];
+        if (len > 4) {
+            // the data starts after 6 bytes (opcode, size, block, each takes 2 bytes)
+            if (len > 6) messageData.add(packetBytes[len - 1]);
 
-        msg[0] = OpCodes.LOGRQ.getBytes()[0];
-        msg[1] = OpCodes.LOGRQ.getBytes()[1];
-        msg[2] = block[0];
-        msg[3] = block[1];
+            // this is the end of the packet
+            if (--leftToRead == 0) {
+                len = 0;
 
-        return msg;
+                if (lastDataPacket) {
+                    message = new byte[2 + messageData.size()];
+
+                    message[0] = OpCodes.DATA.getBytes()[0];
+                    message[1] = OpCodes.DATA.getBytes()[1];
+
+                    int i = 2;
+
+                    while (!messageData.isEmpty()) message[i++] = messageData.removeFirst();
+                }
+            }
+        }
+
+        return message;
+    }
+
+    private byte[] decodeAck() {
+        byte[] message = null;
+
+        if (len == 4) {
+            message = Arrays.copyOf(packetBytes, len);
+            len = 0;
+        }
+
+        return message;
+    }
+
+    private byte[] decodeBCAST() {
+        byte[] message = null;
+
+        if (len > 3 && packetBytes[len - 1] == 0) {
+            message = Arrays.copyOf(packetBytes, len);
+            len = 0;
+        }
+
+        return message;
+    }
+
+    private byte[] decodeERR() {
+        byte[] message = null;
+
+        if (len > 4 && packetBytes[len - 1] == 0) {
+            message = Arrays.copyOf(packetBytes, len);
+            len = 0;
+        }
+
+        return message;
+    }
+
+    // private byte[] getIllegalOpCodeMSG(){
+    //     byte[] msg = (new String("Illegal TFTP operation – Unknown Opcode.")).getBytes();
+    //     byte[] err = new byte[5 + msg.length];
+
+    //     err[0] = OpCodes.ERROR.getBytes()[0];
+    //     err[1] = OpCodes.ERROR.getBytes()[1];
+    //     err[2] = shortToBytes((short)4)[0];
+    //     err[3] = shortToBytes((short)4)[1];
+
+    //     for (int i = 0; i < msg.length; i++){
+    //         err[4 + i] = msg[i];
+    //     }
+
+    //     err[err.length - 1] = 0;
+
+    //     return err;
+    // }
+
+    //////////////////////// ENCODER //////////////////////
+
+    @Override
+    public byte[] encode(byte[] message) {
+        return message;
     }
 
     //////////////////////// HELPERS //////////////////////

@@ -7,9 +7,11 @@ import java.net.Socket;
 import java.util.Scanner;
 
 public class TftpClient {
-    //TODO: implement the main logic of the client, when using a thread per client the main logic goes here
+    // TODO: implement the main logic of the client, when using a thread per client
+    // the main logic goes here
     public static void main(String[] args) throws IOException {
-        if (args.length == 0) args = new String[]{"localhost", "7777"};
+        if (args.length == 0)
+            args = new String[] { "localhost", "7777" };
 
         if (args.length < 2) {
             System.out.println("you must supply two arguments: host, port");
@@ -24,7 +26,7 @@ public class TftpClient {
             // BufferedReader and BufferedWriter automatically using UTF-8 encoding
             try (BufferedOutputStream out = new BufferedOutputStream(sock.getOutputStream())) {
                 System.out.println("Starting keyboard thread...");
-                MessageEncoderDecoder<String> encoderDecoder = new TftpEncoderDecoder();
+                MessageEncoderDecoder<byte[]> encoderDecoder = new TftpEncoderDecoder();
 
                 while (true) {
                     String message;
@@ -45,8 +47,8 @@ public class TftpClient {
 
         Thread listeningThread = new Thread(() -> {
             try (BufferedWriter out = new BufferedWriter(new OutputStreamWriter(sock.getOutputStream()));
-                 BufferedReader in = new BufferedReader(new InputStreamReader(sock.getInputStream()))) {
-                //MessageEncoderDecoder<String> encoderDecoder = new TftpEncoderDecoder();
+                    BufferedReader in = new BufferedReader(new InputStreamReader(sock.getInputStream()))) {
+                // MessageEncoderDecoder<String> encoderDecoder = new TftpEncoderDecoder();
 
                 System.out.println("Starting listening thread...");
 
@@ -60,7 +62,8 @@ public class TftpClient {
         });
 
         listeningThread.start();
-        while (!listeningThread.isAlive()) {}
+        while (!listeningThread.isAlive()) {
+        }
         keyboardThread.start();
     }
 }
