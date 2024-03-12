@@ -27,7 +27,7 @@ public class Listener implements Runnable{
 
     @Override
     public void run(){
-        System.out.println("Starting listening thread...");
+        //System.out.println("Starting listening thread...");
 
         int read;   // current byte
         byte[] nextMessage, response;
@@ -38,7 +38,9 @@ public class Listener implements Runnable{
             
                 if (nextMessage != null) {
                     response = protocol.process(nextMessage);
-                    keyboardHandler.send(response);
+
+                    if (response != null)
+                        keyboardHandler.send(response);
                 }
             }
         } catch (IOException ignored) {

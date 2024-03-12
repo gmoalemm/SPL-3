@@ -25,10 +25,6 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
 
         if (len == 2) opcode = OpCodes.fromBytes(packetBytes[0], packetBytes[1]);
 
-        if (len == 2){
-            System.out.println("Got " + opcode.name() + " message");
-        }
-
         switch (opcode) {
             case RRQ:
             case WRQ:
@@ -134,24 +130,6 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
 
         return message;
     }
-
-    // private byte[] getIllegalOpCodeMSG(){
-    //     byte[] msg = (new String("Illegal TFTP operation – Unknown Opcode.")).getBytes();
-    //     byte[] err = new byte[5 + msg.length];
-
-    //     err[0] = OpCodes.ERROR.getBytes()[0];
-    //     err[1] = OpCodes.ERROR.getBytes()[1];
-    //     err[2] = shortToBytes((short)4)[0];
-    //     err[3] = shortToBytes((short)4)[1];
-
-    //     for (int i = 0; i < msg.length; i++){
-    //         err[4 + i] = msg[i];
-    //     }
-
-    //     err[err.length - 1] = 0;
-
-    //     return err;
-    // }
 
     //////////////////////// ENCODER //////////////////////
 

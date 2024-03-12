@@ -30,11 +30,10 @@ public class KeyboardHandler implements Runnable {
         String message;
         byte[] encodedMessage;
 
-        System.out.println("Starting keyboard thread...");
+        //System.out.println("Starting keyboard thread...");
         
         try {
             while (!protocol.shouldTerminate()) {
-                System.out.print("< ");
                 message = in.readLine();
                 
                 if (message != null) {
@@ -56,14 +55,14 @@ public class KeyboardHandler implements Runnable {
         OpCodes code = OpCodes.fromString(args[0]);
 
         byte[] encodedMessage = null;
-        String arg = args[1];
+        String arg = args.length > 1 ? args[1] : "";
 
         switch (code) {
             case RRQ:   
                 arg = message.substring(args[0].length() + 1);
 
                 if ((new File(arg)).exists()){
-                    System.out.println("> File already exists!");
+                    System.out.println("File already exists!");
                 }
 
                 break;
@@ -71,7 +70,7 @@ public class KeyboardHandler implements Runnable {
                 arg = message.substring(args[0].length() + 1);
 
                 if (!(new File(arg)).exists()){
-                    System.out.println("> File does not exists!");
+                    System.out.println("File does not exists!");
                 }
 
                 break;

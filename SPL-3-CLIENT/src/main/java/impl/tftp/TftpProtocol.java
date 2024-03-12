@@ -79,7 +79,7 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
             
         short ackBlockNum = TftpEncoderDecoder.bytesToShort(message[2], message[3]);
 
-        System.out.println("> ACK " + ackBlockNum);
+        System.out.println("ACK " + ackBlockNum);
 
         OpCodes opcode;
 
@@ -196,9 +196,9 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
             } catch (IOException ignored) {
             } finally {
                 if (pacetSize < TftpEncoderDecoder.MAX_DATA_PACKET) {
-                    System.out.println("> RRQ " + currentFile.getName() + " complete");
+                    System.out.println("RRQ " + currentFile.getName() + " complete");
                     currentFile = null; // the call for the file is finised.
-                    System.out.println("> WRQ " + fileTransfered);
+                    System.out.println("WRQ " + fileTransfered);
                     fileTransfered = "";
                 }
             }
@@ -240,7 +240,7 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
 
         String msg = new String(packet, 4, packet.length - 5, StandardCharsets.UTF_8);
 
-        System.out.println("> Error " + errNum + " (" + msg + ")");
+        System.out.println("Error " + errNum + " (" + msg + ")");
     }
 
     private void handleBCAST(byte[] message) {

@@ -1,3 +1,4 @@
+/mnt/d/guymo/Documents/SPL/SPL-3/SPL-3/SPL-3-SERVER/src/main/java/impl/tftp/PublicResources.java
 /mnt/d/guymo/Documents/SPL/SPL-3/SPL-3/SPL-3-SERVER/src/main/java/impl/tftp/TftpServer.java
 /mnt/d/guymo/Documents/SPL/SPL-3/SPL-3/SPL-3-SERVER/src/main/java/srv/Server.java
 /mnt/d/guymo/Documents/SPL/SPL-3/SPL-3/SPL-3-SERVER/src/main/java/api/BidiMessagingProtocol.java
@@ -8,7 +9,7 @@
 /mnt/d/guymo/Documents/SPL/SPL-3/SPL-3/SPL-3-SERVER/src/main/java/impl/tftp/TftpProtocol.java
 /mnt/d/guymo/Documents/SPL/SPL-3/SPL-3/SPL-3-SERVER/src/main/java/srv/ConnectionHandler.java
 /mnt/d/guymo/Documents/SPL/SPL-3/SPL-3/SPL-3-SERVER/src/main/java/impl/tftp/ConnectionsImpl.java
+/mnt/d/guymo/Documents/SPL/SPL-3/SPL-3/SPL-3-SERVER/src/main/java/impl/tftp/Errors.java
 /mnt/d/guymo/Documents/SPL/SPL-3/SPL-3/SPL-3-SERVER/src/main/java/api/MessagingProtocol.java
 /mnt/d/guymo/Documents/SPL/SPL-3/SPL-3/SPL-3-SERVER/src/main/java/impl/tftp/OpCodes.java
 /mnt/d/guymo/Documents/SPL/SPL-3/SPL-3/SPL-3-SERVER/src/main/java/srv/Connections.java
-/mnt/d/guymo/Documents/SPL/SPL-3/SPL-3/SPL-3-SERVER/src/main/java/impl/tftp/LoggedUsers.java
