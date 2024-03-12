@@ -131,7 +131,7 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
                 shouldTerminate = true;
                 break;
             default:
-                response = createErrorMessage(Errors.NOT_DEFINED);
+                response = createErrorMessage(Errors.ILLEGAL_OP);
                 break;
         }
 

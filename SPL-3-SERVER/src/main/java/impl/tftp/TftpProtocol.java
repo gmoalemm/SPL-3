@@ -77,7 +77,6 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
                 break;
             case DISC:
                 isLoggedIn = false;
-                System.out.println("sending ACK");
                 connections.send(connectionId, buildAckPacket((short)0));
                 connections.disconnect(connectionId);
                 break;
@@ -241,7 +240,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
         try {
             PublicResources.accessSemaphore.acquire();
 
-            File folder = new File("server" + File.separator + "Files" + File.separator);
+            File folder = new File(directoryPath);
             File[] files = folder.listFiles();
             ArrayDeque<Byte> message = new ArrayDeque<>();
             byte[] packet;
@@ -289,7 +288,6 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
         }
 
         PublicResources.usersMap.put(connectionId, username);
-        System.out.println("Added " + username + " as #" + connectionId);
         isLoggedIn = true;
 
         // send ack

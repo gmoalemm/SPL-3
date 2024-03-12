@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.Socket;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
 import api.MessagingProtocol;
@@ -39,15 +40,18 @@ public class KeyboardHandler implements Runnable {
                     
                 if (message != null) {
                     encodedMessage = encodeMessage(message);
-                    protocol.process(encodedMessage);   // response should be null, just inform the thread that we sent this message
-                    send(encodedMessage);
 
-                    if (KeyboardHandler.getOpCode(encodedMessage) == OpCodes.DISC){
-                        try {
-                            synchronized (discLock){
-                                discLock.wait();
+                    if (encodedMessage != null){
+                        protocol.process(encodedMessage);   // response should be null, just inform the thread that we sent this message
+                        send(encodedMessage);
+
+                        if (KeyboardHandler.getOpCode(encodedMessage) == OpCodes.DISC){
+                            try {
+                                synchronized (discLock){
+                                    discLock.wait();
+                                }
+                            } catch (InterruptedException ignored) {
                             }
-                        } catch (InterruptedException ignored) {
                         }
                     }
                 }
@@ -63,51 +67,69 @@ public class KeyboardHandler implements Runnable {
         return OpCodes.fromBytes(msg[0], msg[1]);
     }
 
+    private boolean argumentIsValid(byte[] arr){
+        if (arr != null && arr.length > 0){
+            for (byte b : arr){
+                if (b == 0){
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
     private byte[] encodeMessage(String message){
         String[] args = message.split(" ");
 
         OpCodes code = OpCodes.fromString(args[0]);
 
         byte[] encodedMessage = null;
-        String arg = args.length > 1 ? args[1] : "";
+        String arg = args.length > 1 ? message.substring(args[0].length() + 1) : "";
 
         switch (code) {
             case RRQ:   
-                arg = message.substring(args[0].length() + 1);
-
-                if ((new File(arg)).exists()){
-                    System.out.println("File already exists!");
-                }
-
+                if (!argumentIsValid(arg.getBytes())) { System.out.println("Invalid filename"); return null; }
+                else if ((new File(arg)).exists()) { System.out.println("File already exists!"); return null; }
+                encodedMessage = encapsulate(arg.getBytes(), code);
                 break;
             case WRQ:
-                arg = message.substring(args[0].length() + 1);
-
-                if (!(new File(arg)).exists()){
-                    System.out.println("File does not exists!");
-                }
-
+                if (!argumentIsValid(arg.getBytes())) { System.out.println("Invalid filename"); return null; }
+                else if ((new File(arg)).exists()) { System.out.println("File does not exist!"); return null; }
+                encodedMessage = encapsulate(arg.getBytes(), code);
                 break;
-            case DELRQ: //
-                arg = message.substring(args[0].length() + 1);
+            case DELRQ:
+                if (!argumentIsValid(arg.getBytes())) { System.out.println("Invalid filename"); return null; }
+                encodedMessage = encapsulate(arg.getBytes(), code);
+                break;
             case LOGRQ:
                 byte[] encodedArg = arg.getBytes(StandardCharsets.UTF_8);
-                encodedMessage = new byte[3 + encodedArg.length];
-                encodedMessage[0] = code.getBytes()[0];
-                encodedMessage[1] = code.getBytes()[1];
-                encodedMessage[encodedMessage.length - 1] = 0;
-                for (int i = 0; i < encodedArg.length; i++)
-                     encodedMessage[2 + i] = encodedArg[i]; //copy the argument to the messege.
+
+                if (!argumentIsValid(arg.getBytes())) { System.out.println("Invalid username"); return null; }
+                else if ((new File(arg)).exists()) { System.out.println("File does not exist!"); return null; }
+                encodedMessage = encapsulate(encodedArg, code);
                 break;
             case DIRQ:
             case DISC:
                 encodedMessage = code.getBytes();
                 break;
             default:
-                System.out.println(Errors.NOT_DEFINED.getMessage());
+                System.out.println(Errors.ILLEGAL_OP.getMessage());
                 break;        
         }
 
+        return encodedMessage;
+    }
+
+    private byte[] encapsulate(byte[] encodedArg, OpCodes code){
+        byte[] encodedMessage = new byte[3 + encodedArg.length];
+        encodedMessage[0] = code.getBytes()[0];
+        encodedMessage[1] = code.getBytes()[1];
+        encodedMessage[encodedMessage.length - 1] = 0;
+        for (int i = 0; i < encodedArg.length; i++)
+            encodedMessage[2 + i] = encodedArg[i]; //copy the argument to the messege.
         return encodedMessage;
     }
 

@@ -25,10 +25,6 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
 
         if (len == 2) opcode = OpCodes.fromBytes(packetBytes[0], packetBytes[1]);
 
-        if (len == 2){
-            System.out.println("Got " + opcode.name() + " message");
-        }
-
         switch (opcode) {
             case RRQ:
             case WRQ:
