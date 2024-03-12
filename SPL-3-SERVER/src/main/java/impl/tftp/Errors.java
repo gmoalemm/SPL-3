@@ -45,19 +45,19 @@ public enum Errors {
             case NOT_DEFINED:
                 return "Not defined, see error message (if any).";
             case FILE_NOT_FOUND:
-                return "File not found – RRQ DELRQ of non-existing file.";
+                return "File not found, RRQ DELRQ of non-existing file.";
             case ACCESS_VIOLATION:
-                return " Access violation – File cannot be written, read or deleted.";
+                return " Access violation, File cannot be written, read or deleted.";
             case DISC_FULL:
-                return "Disk full or allocation exceeded – No room in disk.";
+                return "Disk full or allocation exceeded, No room in disk.";
             case ILLEGAL_OP:
-                return "Illegal TFTP operation – Unknown Opcode.";
+                return "Illegal TFTP operation, Unknown Opcode.";
             case FILE_EXISTS:
-                return "File already exists – File name exists on WRQ.";
+                return "File already exists, File name exists on WRQ.";
             case NOT_LOGGED_IN:
-                return "User not logged in – Any opcode received before Login completes.";
+                return "User not logged in, Any opcode received before Login completes.";
             case ALR_LOGGED_IN:
-                return "User already logged in – Login username already connected.";
+                return "User already logged in, Login username already connected.";
             default:
                 return "Not defined, see error message (if any).";
         }
