@@ -31,6 +31,6 @@ public class ConnectionsImpl<T> implements Connections<T> {
     @Override
     public void disconnect(int connectionId) {
         connectionsMap.remove(connectionId);
-        LoggedUsers.usersMap.remove(connectionId);
+        PublicResources.usersMap.remove(connectionId);
     }
 }

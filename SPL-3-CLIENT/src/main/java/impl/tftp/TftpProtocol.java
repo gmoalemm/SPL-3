@@ -15,11 +15,12 @@ import java.nio.file.Paths;
 
 public class TftpProtocol implements MessagingProtocol<byte[]> {
     private boolean shouldTerminate = false;
-    private short lastBlockNumber = 1;
+    private short lastBlockNumber = 0;
     private Queue<byte[]> packetsQueue; // packets that require ACK only
     private OpCodes lastKeyboardOptOpcode = OpCodes.UNKNOWN;
     private File currentFile;
     private final String directoryPath = "/SPL-3-CLIENT/";
+    private String fileTransfered = "";
     private ArrayDeque<Byte> currentDirName = new ArrayDeque<>();
 
     @Override
@@ -78,6 +79,8 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
             
         short ackBlockNum = TftpEncoderDecoder.bytesToShort(message[2], message[3]);
 
+        System.out.println("> ACK " + ackBlockNum);
+
         OpCodes opcode;
 
         byte[] lastSentPacket = null;
@@ -106,11 +109,12 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
         switch (opcode) {
             case RRQ:
                 filename = new String(message, 2, message.length - 2, StandardCharsets.UTF_8);
-                resetFile(filename);
+                createFile(filename);
                 break;
             case WRQ:
                 filename = new String(message, 2, message.length - 2, StandardCharsets.UTF_8);
                 addDataPackets(filename);
+                fileTransfered = filename;
             case DATA:
                 packetsQueue.remove();
                 response = packetsQueue.peek();
@@ -142,33 +146,28 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
             int nextByte;
             byte[] packet;
 
+            lastBlockNumber = 0;
+
             // read each byte
             while ((nextByte = fstream.read()) != -1) {
                 packetData.add((byte) nextByte);
 
                 // if reached max num of bytes in a packet, create one
                 if (packetData.size() == TftpEncoderDecoder.MAX_DATA_PACKET) {
-                    packet = buildDataPacket(packetData, lastBlockNumber++);
+                    packet = buildDataPacket(packetData, ++lastBlockNumber);
                     packetsQueue.add(packet);
                     packetData.clear();
                 }
             }
 
             // last packet
-            packet = buildDataPacket(packetData, lastBlockNumber);
+            packet = buildDataPacket(packetData, ++lastBlockNumber);
             packetsQueue.add(packet);
         } catch (IOException ignored) {
         }
     }
 
-    private void resetFile(String filename){
-        currentFile = new File(directoryPath + File.separator + filename);
-
-        //the file alredy exiset and the clinet want to get new version.
-        if (currentFile.exists()){
-            currentFile.delete();
-        }
-
+    private void createFile(String filename){
         Path filePath = Paths.get(directoryPath + File.separator + filename);
 
         // Create the directory if it doesn't exist
@@ -179,6 +178,7 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
             Files.createFile(filePath);
 
             currentFile = new File(filePath.toString());
+            fileTransfered = filename;
         } catch (IOException ignored) {
                 
         }
@@ -196,7 +196,10 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
             } catch (IOException ignored) {
             } finally {
                 if (pacetSize < TftpEncoderDecoder.MAX_DATA_PACKET) {
+                    System.out.println("> RRQ " + currentFile.getName() + " complete");
                     currentFile = null; // the call for the file is finised.
+                    System.out.println("> WRQ " + fileTransfered);
+                    fileTransfered = "";
                 }
             }
         }
@@ -237,7 +240,7 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
 
         String msg = new String(packet, 4, packet.length - 5, StandardCharsets.UTF_8);
 
-        System.out.println("Error " + errNum + " (" + msg + ")");
+        System.out.println("> Error " + errNum + " (" + msg + ")");
     }
 
     private void handleBCAST(byte[] message) {

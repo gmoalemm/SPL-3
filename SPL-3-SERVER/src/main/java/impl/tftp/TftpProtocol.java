@@ -22,8 +22,10 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
     private short lastBlockNumber = 0;
     private Queue<byte[]> packetsQueue; 
     private Connections<byte[]> connections;
-    private File currentFile;
+    //private File currentFile;
+    private String newFilename;
     private final String directoryPath = "/SPL-3-SERVER/Files";
+    private ArrayDeque<byte[]> newFileBytes;
 
     @Override
     public void start(int connectionId, Connections<byte[]> connections) {
@@ -32,7 +34,9 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
         this.connections = connections;
         this.isLoggedIn = false;
         this.packetsQueue = new LinkedBlockingDeque<>();
-        this.currentFile = null;
+        //this.currentFile = null;
+        this.newFilename = new String();
+        this.newFileBytes = new ArrayDeque<>();
     }
 
     @Override
@@ -151,118 +155,139 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
     }
 
     private void handleRRQ(String filename) {
-        // open the file
-        File file;
+        try {
+            PublicResources.accessSemaphore.acquire();
 
-        file = new File(directoryPath + filename);
+            // open the file
+            File file = new File(directoryPath + filename);
 
-        if (!file.exists()) {
-            connections.send(connectionId, createErrorMessage(Errors.FILE_NOT_FOUND));
-            return;
-        }
+            FileInputStream fstream = new FileInputStream(file);
 
-        try (FileInputStream fstream = new FileInputStream(file)) {
+            if (!file.exists()) {
+                connections.send(connectionId, createErrorMessage(Errors.FILE_NOT_FOUND));
+                fstream.close();
+                PublicResources.accessSemaphore.release();
+                return;
+            }
+
             addDataPackets(filename);
             
             connections.send(connectionId, buildAckPacket((short)0));
             connections.send(connectionId, packetsQueue.peek());
-        } catch (IOException ignored) {
+
+            fstream.close();
+
+            PublicResources.accessSemaphore.release();
+        } catch (IOException | InterruptedException ignored) {
         }
     }
 
     private void handleWRQ(String filename){
-        // open the file
-        File file;
-        byte[] packet;
-
-        file = new File(directoryPath + File.separator + filename);
-
-        if (file.exists()) {
-            connections.send(connectionId, createErrorMessage(Errors.FILE_EXISTS));
-            return;
-        }
-
-
         try {
-            Path filePath = Paths.get(directoryPath + File.separator + filename);
+            PublicResources.accessSemaphore.acquire();
 
-            // Create the directory if it doesn't exist
-            Files.createDirectory(filePath.getParent());
+            // open the file
+            File file;
+            byte[] packet;
 
-            // Create the file
-            Files.createFile(filePath);
+            file = new File(directoryPath + File.separator + filename);
 
-            currentFile = new File(filePath.toString());
+            if (file.exists()) {
+                connections.send(connectionId, createErrorMessage(Errors.FILE_EXISTS));
+                return;
+            }
 
-            System.out.println("File created successfully at: " + filePath);
-        } catch (IOException e) {
-            // Handle IOException
-            e.printStackTrace();
+            if (!newFilename.isEmpty()){
+                // in the middle of another writing!
+                connections.send(connectionId, createErrorMessage(Errors.ACCESS_VIOLATION));
+                return;
+            }
+
+            newFilename = filename;
+        
+            packet = buildAckPacket((short)0);
+            connections.send(connectionId, packet); //send ack packet
+
+            PublicResources.accessSemaphore.release();
+        } catch (InterruptedException ignored) {
         }
-    
-        packet = buildAckPacket((short)0);
-        connections.send(connectionId, packet); //send ack packet
     }
 
     private void handleDELRQ(String filename) {
-        // open the file
-        File file;
+        try {
+            PublicResources.accessSemaphore.acquire();
 
-        file = new File(directoryPath + filename);
+            // open the file
+            File file;
 
-        if (file.exists()) {
-            file.delete();
-            connections.send(connectionId, buildAckPacket((short)0));
-            sendBCAST(false, filename); //send all users about the update.
-        }
-        else{
-            connections.send(connectionId, createErrorMessage(Errors.FILE_NOT_FOUND));
+            file = new File(directoryPath + filename);
+
+            if (file.exists()) {
+                file.delete();
+                connections.send(connectionId, buildAckPacket((short)0));
+                sendBCAST(false, filename); // send all users about the update.
+            }
+            else{
+                connections.send(connectionId, createErrorMessage(Errors.FILE_NOT_FOUND));
+            }
+
+            PublicResources.accessSemaphore.release();
+        } catch (InterruptedException ignored) {
         }
     }
 
     private void handleDIRQ() {
-        File folder = new File("server" + File.separator + "Files" + File.separator);
-        File[] files = folder.listFiles();
-        ArrayDeque<Byte> message = new ArrayDeque<>();
-        byte[] packet;
+        try {
+            PublicResources.accessSemaphore.acquire();
 
-        if (files != null) {
-            for (File file : files) {
-                if (message.size() == TftpEncoderDecoder.MAX_DATA_PACKET) {
-                    packet = buildDataPacket(message, ++lastBlockNumber);
-                    packetsQueue.add(packet);
-                    message.clear();
-                }
+            File folder = new File("server" + File.separator + "Files" + File.separator);
+            File[] files = folder.listFiles();
+            ArrayDeque<Byte> message = new ArrayDeque<>();
+            byte[] packet;
 
-                // assuming the file is not a directory
+            if (files != null) {
+                lastBlockNumber = 0;
 
-                for (byte b : file.getName().getBytes()) {
-                    message.add(b);
-
+                for (File file : files) {
                     if (message.size() == TftpEncoderDecoder.MAX_DATA_PACKET) {
                         packet = buildDataPacket(message, ++lastBlockNumber);
                         packetsQueue.add(packet);
                         message.clear();
                     }
+
+                    // assuming the file is not a directory
+
+                    for (byte b : file.getName().getBytes()) {
+                        message.add(b);
+
+                        if (message.size() == TftpEncoderDecoder.MAX_DATA_PACKET) {
+                            packet = buildDataPacket(message, ++lastBlockNumber);
+                            packetsQueue.add(packet);
+                            message.clear();
+                        }
+                    }
+
+                    message.add((byte) 0);
                 }
 
-                message.add((byte) 0);
+                message.removeLast();
+                packet = buildDataPacket(message, ++lastBlockNumber);
+                packetsQueue.add(packet);
             }
 
-            message.removeFirst();
-            packet = buildDataPacket(message, ++lastBlockNumber);
-            packetsQueue.add(packet);
+            PublicResources.accessSemaphore.release();
+        } catch (InterruptedException ignored) {
         }
     }
 
     private void handleLogin(String username) {
        //the clinet is alredy looge d in.
-        if (isLoggedIn || LoggedUsers.usersMap.containsValue(username)){
+        if (isLoggedIn || PublicResources.usersMap.containsValue(username)){
             connections.send(connectionId, createErrorMessage(Errors.ALR_LOGGED_IN));
             return;
         }
 
-        LoggedUsers.usersMap.put(connectionId, username);
+        PublicResources.usersMap.put(connectionId, username);
         System.out.println("Added " + username + " as #" + connectionId);
         isLoggedIn = true;
 
@@ -272,31 +297,15 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
 
     private void handleData(byte[] packet){
         short blockNumber = TftpEncoderDecoder.bytesToShort(packet[2], packet[3]);
-
-        //case of the data pakeges contain file.
-        if (currentFile != null){
-            try (FileOutputStream fStream = new FileOutputStream(currentFile)) {
-                fStream.write(packet, 6, packet.length - 6);
-            } catch (IOException ignored) {
-            }
-            finally{
-                if (packet.length < TftpEncoderDecoder.MAX_DATA_PACKET){
-                    sendBCAST(true, currentFile.getName()); //send all useres about the uptadet
-                    currentFile = null; //the call for the file is finised.
-                }
-            }
-        }
-        // the data is a files' names.
-        else{
-            for (int i = 6; i < packet.length; i++){
-                if (packet[i] == 0)
-                    System.out.println();
-                else
-                    System.out.println(new String(new byte[]{packet[i]}, StandardCharsets.UTF_8));
-            }
-        }
+        short packetSize = TftpEncoderDecoder.bytesToShort(packet[4], packet[5]);
 
         connections.send(connectionId, buildAckPacket(blockNumber));
+
+        newFileBytes.add(packet);
+
+        if (packetSize < TftpEncoderDecoder.MAX_DATA_PACKET){
+            createNewFile();
+        }
     }
 
     private void handleError(byte[] packet){
@@ -321,7 +330,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
 
         packet[packet.length - 1] = (byte)0;
 
-        for (Map.Entry<Integer, String> entry : LoggedUsers.usersMap.entrySet()) {
+        for (Map.Entry<Integer, String> entry : PublicResources.usersMap.entrySet()) {
             Integer id = entry.getKey();
             connections.send(id, packet);
         }
@@ -375,45 +384,55 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
             int nextByte;
             byte[] packet;
 
+            lastBlockNumber = 0;
+
             // read each byte
             while ((nextByte = fstream.read()) != -1) {
                 packetData.add((byte) nextByte);
 
                 // if reached max num of bytes in a packet, create one
                 if (packetData.size() == TftpEncoderDecoder.MAX_DATA_PACKET) {
-                    packet = buildDataPacket(packetData, lastBlockNumber++);
+                    packet = buildDataPacket(packetData, ++lastBlockNumber);
                     packetsQueue.add(packet);
                     packetData.clear();
                 }
             }
 
             // last packet
-            packet = buildDataPacket(packetData, lastBlockNumber);
+            packet = buildDataPacket(packetData, ++lastBlockNumber);
             packetsQueue.add(packet);
         } catch (IOException ignored) {
         }
     }
 
-    private void resetFile(String filename){
-        currentFile = new File(directoryPath + File.separator + filename);
-
-        //the file alredy exiset and the clinet want to get new version.
-        if (currentFile.exists()){
-            currentFile.delete();
-        }
-
-        Path filePath = Paths.get(directoryPath + File.separator + filename);
-
-        // Create the directory if it doesn't exist
+    private void createNewFile(){
         try {
+            Path filePath = Paths.get(directoryPath + File.separator + newFilename);
+
+            // Create the directory if it doesn't exist
             Files.createDirectory(filePath.getParent());
 
             // Create the file
             Files.createFile(filePath);
 
-            currentFile = new File(filePath.toString());
+            File newFile = new File(filePath.toString());
+
+            byte[] packet = null;
+
+            try (FileOutputStream fStream = new FileOutputStream(newFile)) {
+                while (!newFileBytes.isEmpty()) {
+                    packet = newFileBytes.removeFirst();
+                    fStream.write(packet, 6, packet.length - 6);
+                }
+            } catch (IOException ignored) {
+            }
+            finally{
+                sendBCAST(true, newFilename); //send all useres about the update
+                newFilename = "";
+            }
+
+            System.out.println("File created successfully at: " + filePath);
         } catch (IOException ignored) {
-                
         }
     }
 }

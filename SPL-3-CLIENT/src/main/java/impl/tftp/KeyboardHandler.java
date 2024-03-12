@@ -2,6 +2,7 @@ package impl.tftp;
 
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.Socket;
@@ -55,13 +56,29 @@ public class KeyboardHandler implements Runnable {
         OpCodes code = OpCodes.fromString(args[0]);
 
         byte[] encodedMessage = null;
+        String arg = args[1];
 
         switch (code) {
-            case RRQ:
+            case RRQ:   
+                arg = message.substring(args[0].length() + 1);
+
+                if ((new File(arg)).exists()){
+                    System.out.println("> File already exists!");
+                }
+
+                break;
             case WRQ:
+                arg = message.substring(args[0].length() + 1);
+
+                if (!(new File(arg)).exists()){
+                    System.out.println("> File does not exists!");
+                }
+
+                break;
+            case DELRQ: //
+                arg = message.substring(args[0].length() + 1);
             case LOGRQ:
-            case DELRQ:
-                byte[] encodedArg = args[1].getBytes(StandardCharsets.UTF_8);
+                byte[] encodedArg = arg.getBytes(StandardCharsets.UTF_8);
                 encodedMessage = new byte[3 + encodedArg.length];
                 encodedMessage[0] = code.getBytes()[0];
                 encodedMessage[1] = code.getBytes()[1];

@@ -4,6 +4,7 @@ import java.io.*;
 import java.net.Socket;
 
 import api.MessagingProtocol;
+import api.MessageEncoderDecoder;
 
 public class TftpClient {
     public static void main(String[] args) throws IOException {
@@ -21,11 +22,15 @@ public class TftpClient {
         Socket sock = new Socket(host, port);
 
         MessagingProtocol<byte[]> protocol = new TftpProtocol();
+        MessageEncoderDecoder<byte[]> encdec = new TftpEncoderDecoder();
         
-        Runnable inputHandler = new KeyboardHandler(sock, protocol);
+        KeyboardHandler inputHandler = new KeyboardHandler(sock, protocol);
         Thread keyboardThread = new Thread(inputHandler);
 
+        Runnable listener = new Listener(sock, encdec, protocol, inputHandler);
+        Thread listenerThread = new Thread(listener);
+
         keyboardThread.start();
-        
+        listenerThread.start();
     }
 }
