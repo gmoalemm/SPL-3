@@ -116,41 +116,17 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
         short packetBlockNum = TftpEncoderDecoder.bytesToShort(firstPacket[2], firstPacket[3]);
         OpCodes opcode = OpCodes.fromBytes(firstPacket[0], firstPacket[1]);
 
-        switch (opcode) {
-            case DATA:
-                if (packetBlockNum != blockNumber){
-                    connections.send(connectionId, createErrorMessage(Errors.NOT_DEFINED));
-                    return;
-                }
+        if (opcode == OpCodes.DATA){
+            if (packetBlockNum != blockNumber){
+                connections.send(connectionId, createErrorMessage(Errors.NOT_DEFINED));
+                return;
+            }
 
-                packetsQueue.remove(); //the first packed was ssufuuly handle
+            packetsQueue.remove(); //the first packed was ssufuuly handle
 
-                if (!packetsQueue.isEmpty()){
-                    connections.send(connectionId, packetsQueue.peek());
-                }
-                break;
-            case LOGRQ:
-                if (packetBlockNum != 0)
-                    connections.send(connectionId, createErrorMessage(Errors.NOT_DEFINED));
-                else{
-                    isLoggedIn = true;
-                }
-                break;
-            case WRQ:
-            case DELRQ:
-                if (packetBlockNum != 0)
-                    connections.send(connectionId, createErrorMessage(Errors.NOT_DEFINED));
-                break;
-            case DISC:
-                if (packetBlockNum != 0)
-                    connections.send(connectionId, createErrorMessage(Errors.NOT_DEFINED));
-                else{
-                    isLoggedIn = false;
-                    shouldTerminate = false;
-                }
-                break; 
-            default:
-                break;
+            if (!packetsQueue.isEmpty()){
+                connections.send(connectionId, packetsQueue.peek());
+            }
         }
     }
 
@@ -291,7 +267,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
         isLoggedIn = true;
 
         // send ack
-        packetsQueue.add(buildAckPacket((short)0));
+        connections.send(connectionId, buildAckPacket((short)0));
     }
 
     private void handleData(byte[] packet){
