@@ -77,6 +77,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
                 break;
             case DISC:
                 isLoggedIn = false;
+                System.out.println("sending ACK");
                 connections.send(connectionId, buildAckPacket((short)0));
                 connections.disconnect(connectionId);
                 break;
@@ -368,8 +369,8 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
         byte[] packet = new byte[4];
         byte[] block = TftpEncoderDecoder.shortToBytes(blockNum);
 
-        packet[0] = OpCodes.LOGRQ.getBytes()[0];
-        packet[1] = OpCodes.LOGRQ.getBytes()[1];
+        packet[0] = OpCodes.ACK.getBytes()[0];
+        packet[1] = OpCodes.ACK.getBytes()[1];
         packet[2] = block[0];
         packet[3] = block[1];
 

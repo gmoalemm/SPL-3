@@ -21,7 +21,6 @@ public class Listener implements Runnable{
 
         this.encdec = encdec;
         this.protocol = protocol;
-
         this.keyboardHandler = keyboardHandler;
     }
 
@@ -41,6 +40,10 @@ public class Listener implements Runnable{
 
                     if (response != null)
                         keyboardHandler.send(response);
+
+                    synchronized (keyboardHandler.discLock){
+                        keyboardHandler.discLock.notify();
+                    }
                 }
             }
         } catch (IOException ignored) {

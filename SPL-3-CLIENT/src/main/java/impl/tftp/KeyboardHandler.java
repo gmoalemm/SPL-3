@@ -14,6 +14,7 @@ public class KeyboardHandler implements Runnable {
     private BufferedOutputStream out;
     private BufferedReader in;
     private MessagingProtocol<byte[]> protocol;
+    public Object discLock;
 
     public KeyboardHandler(Socket socket, MessagingProtocol<byte[]> protocol){        
         try {
@@ -23,23 +24,32 @@ public class KeyboardHandler implements Runnable {
         }
 
         this.protocol = protocol;
+
+        this.discLock = new Object();
     }
 
     @Override
     public void run(){
         String message;
         byte[] encodedMessage;
-
-        //System.out.println("Starting keyboard thread...");
         
         try {
             while (!protocol.shouldTerminate()) {
                 message = in.readLine();
-                
+                    
                 if (message != null) {
                     encodedMessage = encodeMessage(message);
-                    protocol.process(encodedMessage);
+                    protocol.process(encodedMessage);   // response should be null, just inform the thread that we sent this message
                     send(encodedMessage);
+
+                    if (KeyboardHandler.getOpCode(encodedMessage) == OpCodes.DISC){
+                        try {
+                            synchronized (discLock){
+                                discLock.wait();
+                            }
+                        } catch (InterruptedException ignored) {
+                        }
+                    }
                 }
             }
 
@@ -47,6 +57,10 @@ public class KeyboardHandler implements Runnable {
             out.close();
         } catch (IOException ignored) {
         }
+    }
+
+    public static OpCodes getOpCode(byte[] msg){
+        return OpCodes.fromBytes(msg[0], msg[1]);
     }
 
     private byte[] encodeMessage(String message){
