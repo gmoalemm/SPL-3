@@ -122,6 +122,8 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
         short packetBlockNum = TftpEncoderDecoder.bytesToShort(packetToAcknowledge[4], packetToAcknowledge[5]);
         OpCodes opcode = OpCodes.extractOpcode(packetToAcknowledge);
 
+        System.out.println("ACK " + packetBlockNum);
+
         if (opcode == OpCodes.DATA) {
             if (packetBlockNum != blockNumber) {
                 connections.send(connectionId, createErrorMessage(Errors.NOT_DEFINED));
