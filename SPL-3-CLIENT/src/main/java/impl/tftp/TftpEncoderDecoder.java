@@ -1,20 +1,13 @@
 package impl.tftp;
 
-import java.util.ArrayDeque;
 import java.util.Arrays;
-
 import api.MessageEncoderDecoder;
 
 public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
     private final byte[] packetBytes = new byte[1 << 10];
-    private final ArrayDeque<Byte> messageData = new ArrayDeque<>();
-
-    private int len;    // how many byted did we read into the current packet
+    private int len = 0;    // how many byted did we read into the current packet
     private OpCodes opcode;
     private short leftToRead = 0;
-
-    private boolean lastDataPacket = true;
-
     public static final int MAX_DATA_PACKET = 512;
 
     @Override
@@ -71,27 +64,17 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
         if (len == 4) {
             leftToRead = bytesToShort(packetBytes[2], packetBytes[3]);
             leftToRead += 2; // the size of block-number field
-            lastDataPacket = leftToRead < 2 + MAX_DATA_PACKET;
         }
-
-        if (len > 4) {
-            // the data starts after 6 bytes (opcode, size, block, each takes 2 bytes)
-            if (len > 6) messageData.add(packetBytes[len - 1]);
-
+        else if (len > 4) {
             // this is the end of the packet
             if (--leftToRead == 0) {
-                len = 0;
+                message = new byte[len];
 
-                if (lastDataPacket) {
-                    message = new byte[2 + messageData.size()];
-
-                    message[0] = OpCodes.DATA.getBytes()[0];
-                    message[1] = OpCodes.DATA.getBytes()[1];
-
-                    int i = 2;
-
-                    while (!messageData.isEmpty()) message[i++] = messageData.removeFirst();
+                for (int i = 0; i < len; i++){
+                    message[i] = packetBytes[i];
                 }
+
+                len = 0;
             }
         }
 

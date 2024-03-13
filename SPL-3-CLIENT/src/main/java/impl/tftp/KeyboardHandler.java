@@ -88,6 +88,8 @@ public class KeyboardHandler implements Runnable {
         byte[] encodedMessage = null;
         String arg = args.length > 1 ? message.substring(args[0].length() + 1) : "";
 
+        System.out.println(arg);
+
         switch (code) {
             case RRQ:   
                 if (!argumentIsValid(arg.getBytes())) { System.out.println("Invalid filename"); return null; }
@@ -96,7 +98,7 @@ public class KeyboardHandler implements Runnable {
                 break;
             case WRQ:
                 if (!argumentIsValid(arg.getBytes())) { System.out.println("Invalid filename"); return null; }
-                else if ((new File(arg)).exists()) { System.out.println("File does not exist!"); return null; }
+                else if (!(new File(arg)).exists()) { System.out.println("File does not exist!"); return null; }
                 encodedMessage = encapsulate(arg.getBytes(), code);
                 break;
             case DELRQ:
@@ -112,7 +114,6 @@ public class KeyboardHandler implements Runnable {
                 break;
             case DIRQ:
             case DISC:
-                System.out.println("DIRQ -" + code.getBytes()[0] + code.getBytes()[1]);
                 encodedMessage = code.getBytes();
                 break;
             default:
@@ -135,10 +136,19 @@ public class KeyboardHandler implements Runnable {
 
     public synchronized void send(byte[] msg){
         try {
+            printBytes(msg);
             out.write(msg);
             out.flush();
         } catch (IOException ignored) {
 
         }
+    }
+
+    public static void printBytes(byte[] bytes){
+        System.out.println("SENDING");
+        for (byte b : bytes){
+            System.out.println(b + " (" + (new String(new byte[]{b}, StandardCharsets.UTF_8)) + ")");
+        }
+        System.out.println();
     }
 }

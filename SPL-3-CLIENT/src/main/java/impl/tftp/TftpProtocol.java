@@ -5,6 +5,7 @@ import api.MessagingProtocol;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -16,12 +17,13 @@ import java.nio.file.Paths;
 public class TftpProtocol implements MessagingProtocol<byte[]> {
     private boolean shouldTerminate = false;
     private short lastBlockNumber = 0;
-    private Queue<byte[]> packetsQueue; // packets that require ACK only
+    private Queue<byte[]> packetsQueue = new ConcurrentLinkedQueue<>(); // packets that require ACK only
     private OpCodes lastKeyboardOptOpcode = OpCodes.UNKNOWN;
     private File currentFile;
     private final String directoryPath = "";
     private String fileTransfered = "";
     private ArrayDeque<Byte> currentDirName = new ArrayDeque<>();
+    String lastCommandArg;
 
     @Override
     public byte[] process(byte[] message) {
@@ -30,6 +32,7 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
 
         switch (opcode) {
             case DATA:
+                System.out.println("handling DATA");
                 response = handleData(message);
                 break;
             case ACK:
@@ -42,8 +45,12 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
                 handleBCAST(message);
                 break;
             case UNKNOWN:
+                System.out.println("got unknown");
                 response = createErrorMessage(Errors.NOT_DEFINED);
                 break;
+            case RRQ:
+            case WRQ:
+                lastCommandArg = new String(message, 2, message.length - 3, StandardCharsets.UTF_8);
             default:
                 lastKeyboardOptOpcode = opcode;
         }
@@ -89,6 +96,7 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
             opcode = lastKeyboardOptOpcode;
         }
         else if (packetsQueue.isEmpty()) {
+            System.out.println("q is empty");
             return createErrorMessage(Errors.NOT_DEFINED);
         }
         else{
@@ -106,17 +114,19 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
 
         String filename;
 
+        System.out.println("client got " + opcode.name());
+
         switch (opcode) {
-            case RRQ:
+            /*case RRQ:
                 filename = new String(message, 2, message.length - 2, StandardCharsets.UTF_8);
                 createFile(filename);
-                break;
+                break;*/
             case WRQ:
-                filename = new String(message, 2, message.length - 2, StandardCharsets.UTF_8);
+                filename = lastCommandArg;
                 addDataPackets(filename);
                 fileTransfered = filename;
             case DATA:
-                packetsQueue.remove();
+                //packetsQueue.remove();
                 response = packetsQueue.peek();
                 break;
             case LOGRQ:
@@ -139,9 +149,16 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
     }
 
     private void addDataPackets(String filename){
-        File fileToSend = new File(directoryPath + filename);
+        File fileToSend = new File(filename);
+        System.out.println("Working Directory = " + System.getProperty("user.dir"));
+
+
+        System.out.println("fts " + fileToSend);
+
+        if (!fileToSend.exists()) System.out.println("doesnt exists");
 
         try (FileInputStream fstream = new FileInputStream(fileToSend)) {
+            System.out.println("trying");
             ArrayDeque<Byte> packetData = new ArrayDeque<>();
             int nextByte;
             byte[] packet;
@@ -155,6 +172,7 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
                 // if reached max num of bytes in a packet, create one
                 if (packetData.size() == TftpEncoderDecoder.MAX_DATA_PACKET) {
                     packet = buildDataPacket(packetData, ++lastBlockNumber);
+                    System.out.println("packetprint:" + packet);
                     packetsQueue.add(packet);
                     packetData.clear();
                 }
@@ -164,6 +182,7 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
             packet = buildDataPacket(packetData, ++lastBlockNumber);
             packetsQueue.add(packet);
         } catch (IOException ignored) {
+            System.out.println(ignored.getMessage());
         }
     }
 
@@ -185,19 +204,16 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
     }
 
     private byte[] handleData(byte[] packet) {
-        short blockNumber = TftpEncoderDecoder.bytesToShort(packet[2], packet[3]);
-        short pacetSize = TftpEncoderDecoder.bytesToShort(packet[0], packet[1]);
+        short blockNumber = TftpEncoderDecoder.bytesToShort(packet[4], packet[5]);
+        short pacetSize = TftpEncoderDecoder.bytesToShort(packet[2], packet[3]);
         byte[] bytes;
 
-        for (byte b : packet){
-            System.out.print(new String(new byte[]{b}, StandardCharsets.UTF_8));
-        }
-
-        System.out.println();
-
         // case of the data package contain file.
-        if (currentFile != null) {
-            try (FileOutputStream fStream = new FileOutputStream(currentFile)) {
+        if (lastKeyboardOptOpcode == OpCodes.RRQ) {
+            currentFile = new File(lastCommandArg);
+            System.out.println("current file: " + currentFile.getName());
+            //Files.write(directoryPath + File.separator + lastCommandArg, bytes, null)
+            try (FileOutputStream fStream = new FileOutputStream(currentFile, true)) {
                 fStream.write(packet, 6, packet.length - 6);
             } catch (IOException ignored) {
             } finally {
@@ -258,7 +274,7 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
         if (added)
             System.out.print("add ");
         else
-            System.out.println("del ");
+            System.out.print("del ");
 
         System.out.println(filename);
     }
@@ -293,14 +309,28 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
     }
 
     private byte[] buildAckPacket(short blockNum) {
+        System.out.println("Building ACK " + blockNum);
+
         byte[] packet = new byte[4];
         byte[] block = TftpEncoderDecoder.shortToBytes(blockNum);
 
-        packet[0] = OpCodes.LOGRQ.getBytes()[0];
-        packet[1] = OpCodes.LOGRQ.getBytes()[1];
+        packet[0] = OpCodes.ACK.getBytes()[0];
+        packet[1] = OpCodes.ACK.getBytes()[1];
         packet[2] = block[0];
         packet[3] = block[1];
 
+        System.out.println("Packet: " + packet[0] + " " + packet[1] + " " + packet[2] + " " + packet[3]);
+
         return packet;
+    }
+
+    private byte[] trimBytes(byte[] array, int begin, int len){
+        byte[] res = new byte[len];
+
+        for (int i = 0; i < len; i++){
+            res[i] = array[i + begin];
+        }
+
+        return res;
     }
 }

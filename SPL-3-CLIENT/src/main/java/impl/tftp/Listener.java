@@ -3,6 +3,8 @@ package impl.tftp;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+
 import api.MessageEncoderDecoder;
 import api.MessagingProtocol;
 
@@ -36,6 +38,13 @@ public class Listener implements Runnable{
                 nextMessage = encdec.decodeNextByte((byte) read);
             
                 if (nextMessage != null) {
+
+                    // for (byte b : nextMessage){
+                    //     System.out.println(b + " <-> " + new String(new byte[]{b}, StandardCharsets.UTF_8));
+                    // }
+
+                    // System.out.println();
+
                     response = protocol.process(nextMessage);
 
                     if (response != null)

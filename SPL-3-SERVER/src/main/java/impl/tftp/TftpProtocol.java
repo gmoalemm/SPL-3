@@ -43,6 +43,8 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
     public void process(byte[] message) {
         OpCodes opcode = OpCodes.fromBytes(message[0], message[1]);
 
+        System.out.println("Got " + opcode.name());
+
         if (!isLoggedIn && opcode != OpCodes.LOGRQ){
             connections.send(connectionId, createErrorMessage(Errors.NOT_LOGGED_IN));
             return;
@@ -113,7 +115,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
 
     private void handleACK(short blockNumber){
         byte[] firstPacket = packetsQueue.peek();
-        short packetBlockNum = TftpEncoderDecoder.bytesToShort(firstPacket[2], firstPacket[3]);
+        short packetBlockNum = TftpEncoderDecoder.bytesToShort(firstPacket[4], firstPacket[5]);
         OpCodes opcode = OpCodes.fromBytes(firstPacket[0], firstPacket[1]);
 
         if (opcode == OpCodes.DATA){
@@ -135,9 +137,11 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
             PublicResources.accessSemaphore.acquire();
 
             // open the file
-            File file = new File(directoryPath + filename);
+            File file = new File(directoryPath + File.separator + filename);
 
             FileInputStream fstream = new FileInputStream(file);
+
+            System.out.println("wanted to read file " + filename + " and read " + file.getName());
 
             if (!file.exists()) {
                 connections.send(connectionId, createErrorMessage(Errors.FILE_NOT_FOUND));
@@ -148,7 +152,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
 
             addDataPackets(filename);
             
-            connections.send(connectionId, buildAckPacket((short)0));
+            //connections.send(connectionId, buildAckPacket((short)0));
             connections.send(connectionId, packetsQueue.peek());
 
             fstream.close();
@@ -196,7 +200,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
             // open the file
             File file;
 
-            file = new File(directoryPath + filename);
+            file = new File(directoryPath + File.separator + filename);
 
             if (file.exists()) {
                 file.delete();
@@ -251,7 +255,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
                 packet = buildDataPacket(message, ++lastBlockNumber);
                 packetsQueue.add(packet);
 
-                connections.send(connectionId, buildAckPacket((short)0));
+                //connections.send(connectionId, buildAckPacket((short)0));
                 connections.send(connectionId, packetsQueue.peek());
             }
         } catch (InterruptedException ignored) {
@@ -337,22 +341,11 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
         // block no.
         packet[4] = TftpEncoderDecoder.shortToBytes(blockNum)[0];
         packet[5] = TftpEncoderDecoder.shortToBytes(blockNum)[1];
-
-        System.out.println("Bytes size: " + bytes.size());
-        System.out.println("Block number: " + blockNum);
-        
-        for (int i = 0; i < 6; i++){
-            System.out.println(packet[i]);
-        }
-
-        System.out.println();
-
+    
         int bytesSize = bytes.size();
 
         // add the bytes
         for (int j = 0; j < bytesSize; j++){
-            //byte b = bytes.getFirst();
-            //System.out.println(new String(new byte[]{b}, StandardCharsets.UTF_8) + " " + b);
             packet[6 + j] = bytes.removeFirst();
         }
 
@@ -372,9 +365,11 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
     }
 
     private void addDataPackets(String filename){
-        File fileToSend = new File(directoryPath + filename);
+        File fileToSend = new File(directoryPath + File.separator + filename);
 
         try (FileInputStream fstream = new FileInputStream(fileToSend)) {
+            System.out.println("read file");
+
             ArrayDeque<Byte> packetData = new ArrayDeque<>();
             int nextByte;
             byte[] packet;

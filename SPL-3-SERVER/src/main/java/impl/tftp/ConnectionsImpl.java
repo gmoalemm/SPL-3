@@ -1,5 +1,6 @@
 package impl.tftp;
 
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ConcurrentHashMap;
 
 import srv.ConnectionHandler;
@@ -25,6 +26,8 @@ public class ConnectionsImpl<T> implements Connections<T> {
 
         handler.send(msg);
 
+        printBytes((byte[]) msg);
+
         return true;
     }
 
@@ -33,4 +36,13 @@ public class ConnectionsImpl<T> implements Connections<T> {
         connectionsMap.remove(connectionId);
         PublicResources.usersMap.remove(connectionId);
     }
+
+    private static void printBytes(byte[] bytes){
+        System.out.println("SENDING");
+        for (byte b : bytes){
+            System.out.println(b + " (" + (new String(new byte[]{b}, StandardCharsets.UTF_8)) + ")");
+        }
+        System.out.println();
+    }
 }
+
