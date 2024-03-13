@@ -5,22 +5,21 @@ import api.MessageEncoderDecoder;
 
 public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
     private final byte[] packetBytes = new byte[1 << 10];
-    private int len = 0;    // how many byted did we read into the current packet
+    private int len = 0; // how many byted did we read into the current packet
     private OpCodes opcode;
     private short leftToRead = 0;
+
     public static final int MAX_DATA_PACKET = 512;
 
     @Override
     public byte[] decodeNextByte(byte nextByte) {
-        System.out.println(len);
-        
-        packetBytes[len++] = nextByte;
+        packetBytes[len++] = nextByte; // save the last byte
 
-        if (len == 1) return null;
+        if (len == 1)
+            return null;
 
-        if (len == 2) opcode = OpCodes.fromBytes(packetBytes[0], packetBytes[1]);
-
-        System.out.println("DECODED " + opcode.name());
+        if (len == 2)
+            opcode = OpCodes.fromBytes(packetBytes[0], packetBytes[1]);
 
         switch (opcode) {
             case RRQ:
@@ -65,20 +64,16 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
     private byte[] decodeData() {
         byte[] message = null;
 
-        System.out.println(" " + len);
-
         if (len == 4) {
             leftToRead = bytesToShort(packetBytes[2], packetBytes[3]);
             leftToRead += 2; // the size of block-number field
-        }
-        else if (len > 4) {
+        } else if (len > 4) {
             // this is the end of the packet
             if (--leftToRead == 0) {
                 message = new byte[len];
 
-                for (int i = 0; i < len; i++){
+                for (int i = 0; i < len; i++)
                     message[i] = packetBytes[i];
-                }
 
                 len = 0;
             }
@@ -134,6 +129,6 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
     }
 
     public static byte[] shortToBytes(short s) {
-        return new byte[] { (byte) (s >> 8), (byte) (s & 0x00ff) };
+        return new byte[] { (byte) (s >> 8), (byte) (s & 0xff) };
     }
 }

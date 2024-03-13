@@ -1,5 +1,6 @@
 package impl.tftp;
 
+/** Different TFTP errors and their messages and codes. */
 public enum Errors {
     NOT_DEFINED(0),
     FILE_NOT_FOUND(1),
@@ -16,28 +17,50 @@ public enum Errors {
         this.num = (short) num;
     }
 
+    /**
+     * Get the code of the current error.
+     * 
+     * @return a 2-bytes array.
+     */
     public byte[] getBytes() {
         return new byte[] { (byte) (num >> 8), (byte) (num & 0xff) };
     }
 
+    /**
+     * Get the code of the current error.
+     * 
+     * @return the code as a short.
+     */
     public short getShort() {
         return num;
     }
 
+    /**
+     * Create an error enum from an int.
+     * 
+     * @param num error code.
+     * @return corresponding error enum or UNKNOWN enum if the value is invalid.
+     */
     public static Errors fromInt(int num) {
-        for (Errors error : Errors.values()) {
-            if (error.num == num) {
+        for (Errors error : Errors.values())
+            if (error.num == num)
                 return error;
-            }
-        }
 
         return NOT_DEFINED;
     }
 
+    /**
+     * Create an error enum from two bytes.
+     * 
+     * @param a the first byte.
+     * @param b the last byte.
+     * @return corresponding error enum or UNKNOWN enum if the value is invalid.
+     */
     public static Errors fromBytes(byte a, byte b) {
         return fromInt((short) (((short) a) << 8 | (short) (b) & 0x00ff));
     }
 
+    /** Get the error message. */
     public String getMessage() {
         Errors err = this;
 

@@ -3,18 +3,18 @@ package impl.tftp;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
 
 import api.MessageEncoderDecoder;
 import api.MessagingProtocol;
 
-public class Listener implements Runnable{
+public class Listener implements Runnable {
     private BufferedInputStream in;
     private MessageEncoderDecoder<byte[]> encdec;
     private MessagingProtocol<byte[]> protocol;
     private KeyboardHandler keyboardHandler;
 
-    public Listener(Socket socket, MessageEncoderDecoder<byte[]> encdec, MessagingProtocol<byte[]> protocol, KeyboardHandler keyboardHandler){        
+    public Listener(Socket socket, MessageEncoderDecoder<byte[]> encdec, MessagingProtocol<byte[]> protocol,
+            KeyboardHandler keyboardHandler) {
         try {
             this.in = new BufferedInputStream(socket.getInputStream());
         } catch (IOException ignored) {
@@ -27,30 +27,21 @@ public class Listener implements Runnable{
     }
 
     @Override
-    public void run(){
-        //System.out.println("Starting listening thread...");
-
-        int read;   // current byte
+    public void run() {
+        int read; // current byte
         byte[] nextMessage, response;
 
         try {
             while (!protocol.shouldTerminate() && (read = in.read()) >= 0) {
                 nextMessage = encdec.decodeNextByte((byte) read);
-            
+
                 if (nextMessage != null) {
-
-                    // for (byte b : nextMessage){
-                    //     System.out.println(b + " <-> " + new String(new byte[]{b}, StandardCharsets.UTF_8));
-                    // }
-
-                    // System.out.println();
-
                     response = protocol.process(nextMessage);
 
                     if (response != null)
                         keyboardHandler.send(response);
 
-                    synchronized (keyboardHandler.discLock){
+                    synchronized (keyboardHandler.discLock) {
                         keyboardHandler.discLock.notify();
                     }
                 }

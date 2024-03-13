@@ -11,7 +11,8 @@ public class ConnectionsImpl<T> implements Connections<T> {
 
     @Override
     public boolean connect(int connectionId, ConnectionHandler<T> handler) {
-        if (connectionsMap.containsKey(connectionId)) return false;
+        if (connectionsMap.containsKey(connectionId))
+            return false;
 
         connectionsMap.put(connectionId, handler);
 
@@ -20,13 +21,12 @@ public class ConnectionsImpl<T> implements Connections<T> {
 
     @Override
     public boolean send(int connectionId, T msg) {
-        if (!connectionsMap.containsKey(connectionId)) return false;
+        if (!connectionsMap.containsKey(connectionId))
+            return false;
 
         ConnectionHandler<T> handler = connectionsMap.get(connectionId);
 
         handler.send(msg);
-
-        printBytes((byte[]) msg);
 
         return true;
     }
@@ -37,12 +37,13 @@ public class ConnectionsImpl<T> implements Connections<T> {
         PublicResources.usersMap.remove(connectionId);
     }
 
-    private static void printBytes(byte[] bytes){
+    private static void printBytes(byte[] bytes) {
         System.out.println("SENDING");
-        for (byte b : bytes){
-            System.out.println(b + " (" + (new String(new byte[]{b}, StandardCharsets.UTF_8)) + ")");
+
+        for (byte b : bytes) {
+            System.out.println(b + " (" + (new String(new byte[] { b }, StandardCharsets.UTF_8)) + ")");
         }
+
         System.out.println();
     }
 }
-

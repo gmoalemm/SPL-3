@@ -14,9 +14,9 @@ public class KeyboardHandler implements Runnable {
     private BufferedOutputStream out;
     private BufferedReader in;
     private MessagingProtocol<byte[]> protocol;
-    public Object discLock;
+    public Object discLock; // used to lick the thread when the user wants to disconnect
 
-    public KeyboardHandler(Socket socket, MessagingProtocol<byte[]> protocol){        
+    public KeyboardHandler(Socket socket, MessagingProtocol<byte[]> protocol) {
         try {
             this.out = new BufferedOutputStream(socket.getOutputStream());
             this.in = new BufferedReader(new InputStreamReader(System.in));
@@ -24,29 +24,31 @@ public class KeyboardHandler implements Runnable {
         }
 
         this.protocol = protocol;
-
         this.discLock = new Object();
     }
 
     @Override
-    public void run(){
-        String message;
-        byte[] encodedMessage;
-        
+    public void run() {
+        String command; // the command from the user
+        byte[] encodedCommand;
+
         try {
             while (!protocol.shouldTerminate()) {
-                message = in.readLine();
-                    
-                if (message != null) {
-                    encodedMessage = encodeMessage(message);
+                command = in.readLine();
 
-                    if (encodedMessage != null){
-                        protocol.process(encodedMessage);   // response should be null, just inform the thread that we sent this message
-                        send(encodedMessage);
+                if (command != null) {
+                    encodedCommand = encodeCommand(command);
 
-                        if (KeyboardHandler.getOpCode(encodedMessage) == OpCodes.DISC){
+                    if (encodedCommand != null) {
+                        protocol.process(encodedCommand); // response should be null, just inform the thread that we
+                                                          // sent this message
+                        send(encodedCommand);
+
+                        // if the user requested to disconnect, wait until the server send an answer
+                        // that way, the thread won't get stuck on readline
+                        if (OpCodes.extractOpcode(encodedCommand) == OpCodes.DISC) {
                             try {
-                                synchronized (discLock){
+                                synchronized (discLock) {
                                     discLock.wait();
                                 }
                             } catch (InterruptedException ignored) {
@@ -62,17 +64,17 @@ public class KeyboardHandler implements Runnable {
         }
     }
 
-    public static OpCodes getOpCode(byte[] msg){
-        return OpCodes.fromBytes(msg[0], msg[1]);
-    }
-
-    private boolean argumentIsValid(byte[] arr){
-        if (arr != null && arr.length > 0){
-            for (byte b : arr){
-                if (b == 0){
+    /**
+     * Check if a command argument is valid.
+     * 
+     * @param arg the encoded argument.
+     * @return true iff the arg. is valid, false otherwise.
+     */
+    private boolean argumentIsValid(byte[] arg) {
+        if (arg != null && arg.length > 0) {
+            for (byte b : arg)
+                if (b == 0)
                     return false;
-                }
-            }
 
             return true;
         }
@@ -80,63 +82,89 @@ public class KeyboardHandler implements Runnable {
         return false;
     }
 
-    private byte[] encodeMessage(String message){
-        String[] args = message.split(" ");
-
+    /**
+     * 
+     * @param command
+     * @return
+     */
+    private byte[] encodeCommand(String command) {
+        String[] args = command.split(" ");
         OpCodes code = OpCodes.fromString(args[0]);
-
-        byte[] encodedMessage = null;
-        String arg = args.length > 1 ? message.substring(args[0].length() + 1) : "";
-
-        System.out.println(arg);
+        byte[] encodedCommand = null;
+        String arg = args.length > 1 ? command.substring(args[0].length() + 1) : "";
+        byte[] encodedArg = arg.getBytes(StandardCharsets.UTF_8);
 
         switch (code) {
-            case RRQ:   
-                if (!argumentIsValid(arg.getBytes())) { System.out.println("Invalid filename"); return null; }
-                else if ((new File(arg)).exists()) { System.out.println("File already exists!"); return null; }
-                encodedMessage = encapsulate(arg.getBytes(), code);
+            case RRQ:
+                if (!argumentIsValid(encodedArg))
+                    System.out.println("Invalid filename");
+                else if ((new File(arg)).exists())
+                    System.out.println("File already exists!");
+                else
+                    encodedCommand = encapsulate(encodedArg, code);
                 break;
             case WRQ:
-                if (!argumentIsValid(arg.getBytes())) { System.out.println("Invalid filename"); return null; }
-                else if (!(new File(arg)).exists()) { System.out.println("File does not exist!"); return null; }
-                encodedMessage = encapsulate(arg.getBytes(), code);
+                if (!argumentIsValid(encodedArg))
+                    System.out.println("Invalid filename");
+                else if (!(new File(arg)).exists())
+                    System.out.println("File does not exists!");
+                else
+                    encodedCommand = encapsulate(encodedArg, code);
                 break;
             case DELRQ:
-                if (!argumentIsValid(arg.getBytes())) { System.out.println("Invalid filename"); return null; }
-                encodedMessage = encapsulate(arg.getBytes(), code);
+                if (!argumentIsValid(encodedArg))
+                    System.out.println("Invalid filename");
+                else
+                    encodedCommand = encapsulate(encodedArg, code);
                 break;
             case LOGRQ:
-                byte[] encodedArg = arg.getBytes(StandardCharsets.UTF_8);
-
-                if (!argumentIsValid(arg.getBytes())) { System.out.println("Invalid username"); return null; }
-                else if ((new File(arg)).exists()) { System.out.println("File does not exist!"); return null; }
-                encodedMessage = encapsulate(encodedArg, code);
+                if (!argumentIsValid(encodedArg))
+                    System.out.println("Invalid username");
+                else if ((new File(arg)).exists())
+                    System.out.println("File does not exist!");
+                else
+                    encodedCommand = encapsulate(encodedArg, code);
                 break;
             case DIRQ:
             case DISC:
-                encodedMessage = code.getBytes();
+                encodedCommand = code.getBytes();
                 break;
             default:
                 System.out.println(Errors.ILLEGAL_OP.getMessage());
-                break;        
+                break;
         }
 
-        return encodedMessage;
+        return encodedCommand;
     }
 
-    private byte[] encapsulate(byte[] encodedArg, OpCodes code){
+    /**
+     * Create an encoded command from an argument and an opcode.
+     * 
+     * @param encodedArg
+     * @param code
+     * @return encoded command packet.
+     */
+    private byte[] encapsulate(byte[] encodedArg, OpCodes code) {
         byte[] encodedMessage = new byte[3 + encodedArg.length];
+
         encodedMessage[0] = code.getBytes()[0];
         encodedMessage[1] = code.getBytes()[1];
         encodedMessage[encodedMessage.length - 1] = 0;
+
         for (int i = 0; i < encodedArg.length; i++)
-            encodedMessage[2 + i] = encodedArg[i]; //copy the argument to the messege.
+            encodedMessage[2 + i] = encodedArg[i]; // copy the argument to the messege.
+
         return encodedMessage;
     }
 
-    public synchronized void send(byte[] msg){
+    /**
+     * Send a message ro the server.
+     * 
+     * @param msg
+     */
+    public synchronized void send(byte[] msg) {
         try {
-            printBytes(msg);
+            //printBytes(msg);
             out.write(msg);
             out.flush();
         } catch (IOException ignored) {
@@ -144,10 +172,15 @@ public class KeyboardHandler implements Runnable {
         }
     }
 
-    public static void printBytes(byte[] bytes){
+    /**
+     * Helper. Print an array of bytes and their char representation.
+     * 
+     * @param bytes
+     */
+    public static void printBytes(byte[] bytes) {
         System.out.println("SENDING");
-        for (byte b : bytes){
-            System.out.println(b + " (" + (new String(new byte[]{b}, StandardCharsets.UTF_8)) + ")");
+        for (byte b : bytes) {
+            System.out.println(b + " (" + (new String(new byte[] { b }, StandardCharsets.UTF_8)) + ")");
         }
         System.out.println();
     }
