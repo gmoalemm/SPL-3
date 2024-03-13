@@ -1,12 +1,9 @@
-/mnt/c/Users/guymo/Downloads/Skeleton (1)/Skeleton/client/src/main/java/bgu/spl/net/api/MessageEncoderDecoder.java
-/mnt/c/Users/guymo/Downloads/Skeleton (1)/Skeleton/client/src/main/java/bgu/spl/net/impl/tftp/Listener.java
-/mnt/c/Users/guymo/Downloads/Skeleton (1)/Skeleton/client/src/main/java/bgu/spl/net/impl/tftp/TftpProtocol.java
-/mnt/c/Users/guymo/Downloads/Skeleton (1)/Skeleton/client/src/main/java/bgu/spl/net/impl/echo/EchoClient.java
-/mnt/c/Users/guymo/Downloads/Skeleton (1)/Skeleton/client/src/main/java/bgu/spl/net/impl/tftp/KeyboardHandler.java
-/mnt/c/Users/guymo/Downloads/Skeleton (1)/Skeleton/client/src/main/java/bgu/spl/net/impl/echo/EchoProtocol.java
-/mnt/c/Users/guymo/Downloads/Skeleton (1)/Skeleton/client/src/main/java/bgu/spl/net/impl/tftp/Errors.java
-/mnt/c/Users/guymo/Downloads/Skeleton (1)/Skeleton/client/src/main/java/bgu/spl/net/impl/tftp/TftpEncoderDecoder.java
-/mnt/c/Users/guymo/Downloads/Skeleton (1)/Skeleton/client/src/main/java/bgu/spl/net/api/MessagingProtocol.java
-/mnt/c/Users/guymo/Downloads/Skeleton (1)/Skeleton/client/src/main/java/bgu/spl/net/impl/tftp/TftpClient.java
-/mnt/c/Users/guymo/Downloads/Skeleton (1)/Skeleton/client/src/main/java/bgu/spl/net/impl/tftp/OpCodes.java
-/mnt/c/Users/guymo/Downloads/Skeleton (1)/Skeleton/client/src/main/java/bgu/spl/net/impl/echo/LineMessageEncoderDecoder.java
+/mnt/c/Users/guymo/OneDrive/Documents/BGU/Second Year/First Semester/SPL/3rd Assignment/SPL-3/client/src/main/java/bgu/spl/net/impl/tftp/Errors.java
+/mnt/c/Users/guymo/OneDrive/Documents/BGU/Second Year/First Semester/SPL/3rd Assignment/SPL-3/client/src/main/java/bgu/spl/net/impl/tftp/TftpProtocol.java
+/mnt/c/Users/guymo/OneDrive/Documents/BGU/Second Year/First Semester/SPL/3rd Assignment/SPL-3/client/src/main/java/bgu/spl/net/impl/tftp/OpCodes.java
+/mnt/c/Users/guymo/OneDrive/Documents/BGU/Second Year/First Semester/SPL/3rd Assignment/SPL-3/client/src/main/java/bgu/spl/net/impl/tftp/TftpClient.java
+/mnt/c/Users/guymo/OneDrive/Documents/BGU/Second Year/First Semester/SPL/3rd Assignment/SPL-3/client/src/main/java/bgu/spl/net/impl/tftp/TftpEncoderDecoder.java
+/mnt/c/Users/guymo/OneDrive/Documents/BGU/Second Year/First Semester/SPL/3rd Assignment/SPL-3/client/src/main/java/bgu/spl/net/impl/tftp/KeyboardHandler.java
+/mnt/c/Users/guymo/OneDrive/Documents/BGU/Second Year/First Semester/SPL/3rd Assignment/SPL-3/client/src/main/java/bgu/spl/net/api/MessagingProtocol.java
+/mnt/c/Users/guymo/OneDrive/Documents/BGU/Second Year/First Semester/SPL/3rd Assignment/SPL-3/client/src/main/java/bgu/spl/net/api/MessageEncoderDecoder.java
+/mnt/c/Users/guymo/OneDrive/Documents/BGU/Second Year/First Semester/SPL/3rd Assignment/SPL-3/client/src/main/java/bgu/spl/net/impl/tftp/Listener.java

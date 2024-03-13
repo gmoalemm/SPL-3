@@ -6,11 +6,8 @@ bgu/spl/net/impl/tftp/TftpProtocol$1.class
 bgu/spl/net/api/MessagingProtocol.class
 bgu/spl/net/impl/tftp/KeyboardHandler$1.class
 bgu/spl/net/impl/tftp/KeyboardHandler.class
-bgu/spl/net/impl/echo/LineMessageEncoderDecoder.class
 bgu/spl/net/impl/tftp/Errors$1.class
 bgu/spl/net/impl/tftp/TftpEncoderDecoder$1.class
 bgu/spl/net/impl/tftp/OpCodes.class
 bgu/spl/net/impl/tftp/TftpClient.class
-bgu/spl/net/impl/echo/EchoClient.class
-bgu/spl/net/impl/echo/EchoProtocol.class
 bgu/spl/net/impl/tftp/TftpEncoderDecoder.class

@@ -268,7 +268,9 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
                     message.add((byte) 0);
                 }
 
-                message.removeLast();
+                if (!message.isEmpty())
+                    message.removeLast();
+
                 currentPacket = buildDataPacket(message, ++lastBlockNumber);
                 packetsQueue.add(currentPacket);
 
