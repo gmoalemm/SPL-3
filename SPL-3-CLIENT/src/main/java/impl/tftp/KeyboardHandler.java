@@ -112,6 +112,7 @@ public class KeyboardHandler implements Runnable {
                 break;
             case DIRQ:
             case DISC:
+                System.out.println("DIRQ -" + code.getBytes()[0] + code.getBytes()[1]);
                 encodedMessage = code.getBytes();
                 break;
             default:

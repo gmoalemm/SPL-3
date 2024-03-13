@@ -24,7 +24,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
     private Connections<byte[]> connections;
     //private File currentFile;
     private String newFilename;
-    private final String directoryPath = "/SPL-3-SERVER/Files";
+    private final String directoryPath = "Files";
     private ArrayDeque<byte[]> newFileBytes;
 
     @Override
@@ -217,6 +217,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
             PublicResources.accessSemaphore.acquire();
 
             File folder = new File(directoryPath);
+
             File[] files = folder.listFiles();
             ArrayDeque<Byte> message = new ArrayDeque<>();
             byte[] packet;
@@ -249,10 +250,14 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
                 message.removeLast();
                 packet = buildDataPacket(message, ++lastBlockNumber);
                 packetsQueue.add(packet);
-            }
 
-            PublicResources.accessSemaphore.release();
+                connections.send(connectionId, buildAckPacket((short)0));
+                connections.send(connectionId, packetsQueue.peek());
+            }
         } catch (InterruptedException ignored) {
+        }
+        finally{
+            PublicResources.accessSemaphore.release();
         }
     }
 
@@ -333,8 +338,23 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]> {
         packet[4] = TftpEncoderDecoder.shortToBytes(blockNum)[0];
         packet[5] = TftpEncoderDecoder.shortToBytes(blockNum)[1];
 
+        System.out.println("Bytes size: " + bytes.size());
+        System.out.println("Block number: " + blockNum);
+        
+        for (int i = 0; i < 6; i++){
+            System.out.println(packet[i]);
+        }
+
+        System.out.println();
+
+        int bytesSize = bytes.size();
+
         // add the bytes
-        for (int j = 0; j < bytes.size(); j++) packet[6 + j] = bytes.removeFirst();
+        for (int j = 0; j < bytesSize; j++){
+            //byte b = bytes.getFirst();
+            //System.out.println(new String(new byte[]{b}, StandardCharsets.UTF_8) + " " + b);
+            packet[6 + j] = bytes.removeFirst();
+        }
 
         return packet;
     }

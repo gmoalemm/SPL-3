@@ -19,7 +19,7 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
     private Queue<byte[]> packetsQueue; // packets that require ACK only
     private OpCodes lastKeyboardOptOpcode = OpCodes.UNKNOWN;
     private File currentFile;
-    private final String directoryPath = "/SPL-3-CLIENT/";
+    private final String directoryPath = "";
     private String fileTransfered = "";
     private ArrayDeque<Byte> currentDirName = new ArrayDeque<>();
 
@@ -188,6 +188,12 @@ public class TftpProtocol implements MessagingProtocol<byte[]> {
         short blockNumber = TftpEncoderDecoder.bytesToShort(packet[2], packet[3]);
         short pacetSize = TftpEncoderDecoder.bytesToShort(packet[0], packet[1]);
         byte[] bytes;
+
+        for (byte b : packet){
+            System.out.print(new String(new byte[]{b}, StandardCharsets.UTF_8));
+        }
+
+        System.out.println();
 
         // case of the data package contain file.
         if (currentFile != null) {
